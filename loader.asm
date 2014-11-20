@@ -2,7 +2,7 @@ use16
 
 org 0x7c00
 
-loadSegments:
+clear_registers:
     xor ax, ax
     mov ax, 0x10
     mov ds, ax
@@ -10,7 +10,35 @@ loadSegments:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    lgdt gdtr
+   
+    mov ah, 9           ; Print "===="
+    mov al, '='         ;
+    mov bx, 7           ;
+    mov cx, 4           ;
+    int 10h             ;
+
+    hang:                       ; Hang!
+        jmp hang 
+
+    cli
+    lgdt [gdtr]
+    mov eax, cr0
+    or eax, 1
+    mov cr0, eax
+    jmp 0x7e00
+
+error:
+    mov si, .msg
+.loop:
+    lodsb
+    or al, al
+    jz .done
+    mov ah, 0x0e
+    int 0x10
+    jmp .loop
+.done:
+    jmp $
+    .msg db "could not read disk", 0
 
 gdtr:
     dw (gdt_end - gdt) + 1
@@ -42,3 +70,7 @@ gdt:
     db 0b10010010
     db 0b01001111
     dw 0x00 
+gdt_end:
+
+times 510-($-$$) db 0
+dw 0AA55h
