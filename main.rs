@@ -55,7 +55,7 @@ fn clear_screen(background: Color) {
         match r.next() {
             Some(x) => {
                 unsafe {
-                    *((0xb8000 + x * 2) as *mut u16) = (background as u16) << 12 | 7u16 << 8 | 70 ;
+                    *((0xb8000 + x * 2) as *mut u16) = (background as u16) << 12 //| 7u16 << 8 | 70 ;
                 }
             },
             None =>{break}
