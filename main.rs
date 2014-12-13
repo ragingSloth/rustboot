@@ -2,10 +2,18 @@
 #![allow(ctypes)]
 
 #![feature(lang_items)]
-#[lang="sized"]
-trait Sized {}
+#![feature(globs)]
 
-enum Color {
+pub use Color::*;
+pub use Option::*;
+
+#[lang="sized"]
+pub trait Sized for Sized? {}
+
+#[lang="copy"]
+trait Copy for Sized?{}
+
+pub enum Color {
     Black      = 0,
     Blue       = 1,
     Green      = 2,
@@ -24,7 +32,7 @@ enum Color {
     White      = 15,
 }
 
-enum Option<T> {
+pub enum Option<T> {
     None,
     Some(T)
 }
@@ -51,11 +59,12 @@ fn range(lo: int, hi: int) -> IntRange {
 
 fn clear_screen(background: Color) {
     let mut r = range(0, 80 * 25);
+    let color = background as u16;
     loop{
         match r.next() {
             Some(x) => {
                 unsafe {
-                    *((0xb8000 + x * 2) as *mut u16) = (background as u16) << 12 //| 7u16 << 8 | 70 ;
+                    *((0xb8000 + x * 2) as *mut u16) = color << 12 | 7u16 << 8 | 70 ;
                 }
             },
             None =>{break}
