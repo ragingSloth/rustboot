@@ -74,6 +74,6 @@ fn clear_screen(background: Color) {
 
 #[no_mangle]
 #[no_split_stack]
-pub fn main() {
+pub extern "C" fn main() {
     clear_screen(Cyan);
 }
