@@ -4,7 +4,7 @@ NASM=nasm
 QEMU=qemu-system-i386
 
 .SUFFIXES: .o .rs .asm
-.PHONY: clean
+.PHONY: clean run
 
 .asm.o:
 	$(NASM) -f aout -o $@ $<
@@ -13,9 +13,16 @@ QEMU=qemu-system-i386
 	$(RUSTC) -O --target i686-unknown-linux-gnu --crate-type lib -o $@ --emit obj $<
 
 kernel.bin: start.o main.o
-	$(LD) -m i386linux -T link.ld -o $@ $<
+	$(LD) -melf_i386 -Tlink.ld -o $@ $^
 
 all: kernel.bin
 
 clean:
-	rm -rf *.o kernel.bin
+	rm -rf *.o *.iso kernel.bin
+
+run: kernel.bin
+	$(QEMU) -kernel $<
+
+cd: kernel.bin
+	./build_image.sh
+

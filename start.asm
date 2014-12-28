@@ -25,6 +25,8 @@ mboot:
         dd start
 
 stub:
+    extern main
+    call main
     jmp $
 
 SECTION .bss
