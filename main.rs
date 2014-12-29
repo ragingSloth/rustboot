@@ -3,16 +3,17 @@
 #![feature(lang_items)]
 #![feature(globs)]
 
+
 #[lang="sized"]
 pub trait Sized for Sized? {}
 #[lang="copy"]
-pub trait Copy for Sized?{}
-
+pub trait Copy for Sized? {}
 
 pub mod utils;
+pub mod io;
 
 #[no_mangle]
 #[no_split_stack]
 pub extern "C" fn main() {
-    utils::clear_screen(utils::Cyan);
+    io::clear_screen(io::Cyan);
 }
