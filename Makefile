@@ -1,3 +1,4 @@
+SHELL:=/usr/bin/env bash
 LD=ld
 RUSTC=rustc
 NASM=nasm
