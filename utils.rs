@@ -1,3 +1,4 @@
+#![macro_escape]
 pub use self::Option::*;
 
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
@@ -25,9 +26,9 @@ pub enum Option<T> {
 }
 
 pub struct IntRange {
-    cur: int,
-    max: int,
-    inc: int,
+    pub cur: int,
+    pub max: int,
+    pub inc: int,
 }
 
 impl Iterator<int> for IntRange{
@@ -42,12 +43,33 @@ impl Iterator<int> for IntRange{
     }
 }
 
-pub fn range(lo: int, hi: int) -> IntRange {
-    match hi > lo {
-        true => IntRange { cur: lo, max: hi , inc: 1},
-        false => IntRange { cur: lo, max: hi , inc: -1},
-    }
+//pub fn range!(lo: int, hi: int) -> utils::IntRange {
+//    match hi > lo {
+//        true => utils::IntRange { cur: lo, max: hi , inc: 1},
+//        false => utils::IntRange { cur: lo, max: hi , inc: -1},
+//    }
+//}
+#[macro_export]
+macro_rules! range{
+    ($e1: expr, $e2: expr) => ( 
+            {
+                match $e2 > $e1 {
+                    true => IntRange {cur: $e1, max: $e2, inc: 1},
+                    false=> IntRange {cur: $e1, max: $e2, inc: -1},
+                }
+            }
+    );
+    ($e1: expr) => (
+        {
+            match $e1 >= 0 {
+                true => IntRange {cur: 0, max: $e1, inc: 1},
+                false => IntRange{cur: 0, max: $e1, inc: -1},
+            }
+        }
+    );
 }
+
+
 
 ///////////////////////////////////////////////////////
 //MEMORY
@@ -55,7 +77,7 @@ pub fn range(lo: int, hi: int) -> IntRange {
 #[no_mangle]
 #[no_stack_check]
 pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8, n: uint) {
-    for i in range(0, n as int) {
+    for i in range!(n as int) {
         *(offset(dest as *const u8, i) as *mut u8) = *offset(src, i);
     }
 }
@@ -64,8 +86,8 @@ pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8, n: uint) {
 #[no_stack_check]
 pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: uint) {
     let mut block = match src < dest as *const u8 {
-        true => range((n as int) - 1, -1),
-        false => range(0, n as int),
+        true => range!((n as int) - 1, -1),
+        false => range!(n as int),
     };
     for i in block {
         *(offset(dest as *const u8, i) as *mut u8) = *offset(src, i);
@@ -75,7 +97,7 @@ pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: uint) {
 #[no_mangle]
 #[no_stack_check]
 pub unsafe extern fn memset( s: *mut u8, c: i32, n: uint) -> *mut u8 {
-    for i in range(0, n as int) {
+    for i in range!(n as int) {
         *(offset(s as *const u8, i) as *mut u8) = c as u8;
     }
     return s;
@@ -84,7 +106,7 @@ pub unsafe extern fn memset( s: *mut u8, c: i32, n: uint) -> *mut u8 {
 #[no_mangle]
 #[no_stack_check]
 pub unsafe extern fn memcmp(s1: *const u8, s2: *const u8, n: uint) -> i32 {
-    for i in range(0, n as int) {
+    for i in range!(n as int) {
         let a = *offset(s1, i);
         let b = *offset(s2, i);
         if a != b {

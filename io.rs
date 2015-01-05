@@ -1,6 +1,6 @@
 pub use self::Colors::*;
 
-use utils;
+use utils::{transmute, IntRange};
 
 pub enum Colors {
     Black      = 0,
@@ -44,7 +44,7 @@ impl Cell {
 
 pub fn clear_screen(background: Colors) {
     let color = background as u16;
-    for i in utils::range(0, 80*25) {
+    for i in range!(80*25i) {
         unsafe{
             *((0xb8000 + i*2) as *mut u16) = color << 12;
         }
@@ -64,7 +64,7 @@ pub fn put_char(info: &Cell, ch: char) {
 
 #[no_stack_check]
 pub fn puts(head: &mut Cell, s: &str) {
-    let ss: &[u8] = unsafe {utils::transmute(s)};
+    let ss: &[u8] = unsafe {transmute(s)};
     let mut st = ss;
     loop {
         st = match st { 
