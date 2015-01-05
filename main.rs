@@ -3,8 +3,7 @@
 #![feature(lang_items)]
 #![feature(globs)]
 #![feature(intrinsics)]
-
-
+#![feature(macro_rules)]
 
 pub mod utils;
 pub mod io;
@@ -14,12 +13,12 @@ pub mod io;
 pub extern "C" fn main() {
     io::clear_screen(io::Black);
     let mut x = io::Cell {
-        x : 1,
+        x : 0,
         y : 0,
         bg : io::Black as u16,
         fg : io::White as u16, 
     };
-    io::put_char(&x, 'f');
+    //io::put_char(&x, 'f');
     io::puts(&mut x, "hello world!");
     //io::r_write((x as *mut io::Cell), unsafe{utils::transmute("hello world!")});
 }

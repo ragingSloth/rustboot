@@ -1,4 +1,6 @@
 [BITS 32]
+%include "gdt.asm"
+;%include "isr.asm"
 global start
 start:
     mov esp, _sys_stack
@@ -23,11 +25,12 @@ mboot:
         dd bss
         dd end
         dd start
-
 stub:
+    call load_gdt
     extern main
     call main
     jmp $
+
 
 SECTION .bss
     resb 8192

@@ -3,7 +3,7 @@ LD=ld
 RUSTC=rustc
 NASM=nasm
 QEMU=qemu-system-i386
-RUSTCFLAGS= -O --target i686-unknown-linux-gnu --crate-type lib -o 
+RUSTCFLAGS= -O --target i686-unknown-linux-gnu --crate-type lib -C relocation-model=static -o 
 
 .SUFFIXES: .o .rs .asm
 .PHONY: clean run
