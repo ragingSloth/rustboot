@@ -1,4 +1,5 @@
 use utils;
+use io;
 
 #[repr(C, packed)]
 struct IDT {
@@ -15,32 +16,93 @@ struct IDTR {
     base: u32,
 }
 
+#[repr(C, packed)]
+struct Regs {
+    gs: uint,
+    fs: uint,
+    es: uint,
+    ds: uint,
+    edi: uint,
+    esi: uint,
+    ebp: uint,
+    esp: uint,
+    ebx: uint,
+    edx: uint,
+    ecx: uint,
+    eax: uint,
+    int_no: uint,
+    err_no: uint,
+    eip: uint,
+    cs: uint,
+    eflags: uint,
+    useresp: uint,
+    ss: uint,
+}
+
 #[no_mangle]
 static mut idt: [IDT, ..256] = [IDT {base1: 0, selector: 0, zero: 0, attrs: 0, base2: 0}, ..256];
+static mut isrs: [extern "C" unsafe fn, ..32] = [isr0, isr1, isr2, isr3, isr4, isr5, isr6, isr7, isr8, isr9, isr10, isr11, isr12, isr13, isr14, isr15, isr16, isr17, isr18, isr19, isr20, isr21, isr22, isr23, isr24, isr25, isr26, isr27, isr28, isr29, isr30, isr31] 
+static messages = [
+    "divide by zero\n",
+    "debug\n",
+    "non maskable interrupt\n",
+    "breakpoint exception\n",
+    "into detected overflow\n",
+    "out of bounds\n",
+    "invalid opcode\n",
+    "no coprocessor\n",
+    "double fault\n",
+    "coprocessor segment overrun\n",
+    "exception\n",
+    "bad tss\n",
+    "segment not present\n",
+    "stack fault\n",
+    "general protection fault\n",
+    "page fault\n",
+    "unknown interrupt\n",
+    "coprocessor fault\n",
+    "alignment check (i486+)\n",
+    "machine check(pentium/i586+)\n",
+    "reserved\n",
+];
 
 #[no_stack_check]
 #[no_mangle]
 pub extern "C" fn load_idt() {
-
+    for i in range!(32) {
+        set_descriptor(idt[i], isrs[i] as u32, 0x08, 0x8E);
+    }
 }
 
 #[no_stack_check]
-fn set_descriptor(desc: &mut IDT, offset: u32, ring: u8, gate_type: GATE_TYPE, selector: u16){
+#[no_mangle]
+pub extern "C" fn _fault_handler(stack: Regs) {
+    let idx = match r.int_no {
+        x<19 => x,
+        x>19 => 19,
+    }
+    if r.int_no < 32 {
+    io::clear_screen(io::Black);
+    let mut x = io::Cell {
+        x : 0,
+        y : 0,
+        bg : io::Black as u16,
+        fg : io::White as u16, 
+    };
+    io::puts(&mut x, messages[idx]);
+    io::puts(&mut x, "Exception, halting...");
+    loop {}
+    }
+}
+
+#[no_stack_check]
+fn set_descriptor(desc: &mut IDT, offset: u32, selector: u16, config: u8){
     desc.base1 = 0xFFFFu16 & offset;
     desc.base2 = 0xFFFFu16 & offset >> 16;
     desc.selector = selector;
     desc.zero = 0;
-    attrs = 0x80 | ring << 5 | 0x10 | gate_type as u8;
+    desc.attrs = config;
 }
-
-enum GATE_TYPE {
-    task   = 0x5,
-    int16  = 0x6,
-    trap16 = 0x7,
-    int32  = 0xE,
-    trap32 = 0xF,
-}
-
 /////////////////
 //ISRs
 /////////////////
@@ -78,3 +140,4 @@ extern {
     fn isr30();
     fn isr31(); 
 }
+

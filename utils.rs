@@ -35,6 +35,10 @@ impl Iterator<int> for IntRange{
     #[no_stack_check]
     fn next(&mut self) -> Option<int> {
         if self.cur != self.max {
+            if self.cur > self.max == self.inc >0 {
+                self.cur = self.max;
+                self.inc = 0;
+            }
             self.cur += self.inc;
             Some(self.cur - self.inc)
         } else {
@@ -43,29 +47,22 @@ impl Iterator<int> for IntRange{
     }
 }
 
-//pub fn range!(lo: int, hi: int) -> utils::IntRange {
-//    match hi > lo {
-//        true => utils::IntRange { cur: lo, max: hi , inc: 1},
-//        false => utils::IntRange { cur: lo, max: hi , inc: -1},
-//    }
-//}
 #[macro_export]
 macro_rules! range{
     ($e1: expr, $e2: expr) => ( 
-            {
                 match $e2 > $e1 {
                     true => IntRange {cur: $e1, max: $e2, inc: 1},
                     false=> IntRange {cur: $e1, max: $e2, inc: -1},
                 }
-            }
     );
     ($e1: expr) => (
-        {
             match $e1 >= 0 {
                 true => IntRange {cur: 0, max: $e1, inc: 1},
-                false => IntRange{cur: 0, max: $e1, inc: -1},
+                false => IntRange {cur: 0, max: $e1, inc: -1},
             }
-        }
+    );
+    ($e1: expr, $e2: expr, $e3: expr) => (
+        IntRange {cur: $e1, max: $e2, inc: $e3}
     );
 }
 

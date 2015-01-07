@@ -31,8 +31,7 @@ pub struct Cell {
 impl Cell {
     pub fn incr(&mut self) {
         if self.x == 80 {
-            self.y += 1;
-            self.x = -1;
+            self.new_line();
         }
         self.x += 1;
     }
@@ -40,8 +39,14 @@ impl Cell {
     pub fn get_fill(&self) -> int {
         return (self.y * 80 + self.x) * 2;
     }
+
+    pub fn new_line(&mut self) {
+        self.y += 1;
+        self.x = -1;
+    }
 }
 
+#[no_stack_check]
 pub fn clear_screen(background: Colors) {
     let color = background as u16;
     for i in range!(80*25i) {
@@ -69,8 +74,13 @@ pub fn puts(head: &mut Cell, s: &str) {
     loop {
         st = match st { 
             [x, xs..] => {
-                head.incr();
-                put_char(head, (x as char));
+                if x == '\n' as u8 {
+                    head.new_line();
+                }
+                else {
+                    head.incr();
+                    put_char(head, (x as char));
+                }
                 xs
             }
             [] => break,
