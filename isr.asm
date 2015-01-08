@@ -243,3 +243,139 @@ isr_stub:
     popa
     add esp, 8
     iret
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;IRQs
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+global _irq0
+_irq0:
+	cli
+	push byte 0
+	push byte 0
+	jmp irq_stub
+
+global _irq1
+_irq1:
+	cli
+	push byte 0
+	push byte 1
+	jmp irq_stub
+
+global _irq2
+_irq2:
+	cli
+	push byte 0
+	push byte 2
+	jmp irq_stub
+
+global _irq3
+_irq3:
+	cli
+	push byte 0
+	push byte 3
+	jmp irq_stub
+
+global _irq4
+_irq4:
+	cli
+	push byte 0
+	push byte 4
+	jmp irq_stub
+
+global _irq5
+_irq5:
+	cli
+	push byte 0
+	push byte 5
+	jmp irq_stub
+
+global _irq6
+_irq6:
+	cli
+	push byte 0
+	push byte 6
+	jmp irq_stub
+
+global _irq7
+_irq7:
+	cli
+	push byte 0
+	push byte 7
+	jmp irq_stub
+
+global _irq8
+_irq8:
+	cli
+	push byte 0
+	push byte 8
+	jmp irq_stub
+
+global _irq9
+_irq9:
+	cli
+	push byte 0
+	push byte 9
+	jmp irq_stub
+
+global _irq10
+_irq10:
+	cli
+	push byte 0
+	push byte 10
+	jmp irq_stub
+
+global _irq11
+_irq11:
+	cli
+	push byte 0
+	push byte 11
+	jmp irq_stub
+
+global _irq12
+_irq12:
+	cli
+	push byte 0
+	push byte 12
+	jmp irq_stub
+
+global _irq13
+_irq13:
+	cli
+	push byte 0
+	push byte 13
+	jmp irq_stub
+
+global _irq14
+_irq14:
+	cli
+	push byte 0
+	push byte 14
+	jmp irq_stub
+
+irq_stub:
+    pusha
+    push ds
+    push es
+    push fs
+    push gs
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov eax, esp
+    push eax
+
+    extern _irq_handler
+    mov eax, _irq_handler
+    call eax
+
+    pop eax
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    popa
+    add esp, 8
+    iret

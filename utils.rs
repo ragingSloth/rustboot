@@ -1,6 +1,31 @@
 #![macro_escape]
 pub use self::Option::*;
 
+pub fn outb(addr: u8, data: u8) {
+    unsafe {
+        asm!("outb $0, $1",
+            :
+            : "r"(addr), "r"(data)
+            :
+            : "volatile"
+        );
+    }
+}
+pub fn inb(addr: u8) -> u8 {
+    unsafe {
+        let mu
+        asm!("outb $0, $1",
+            :
+            : "r"(addr)
+            : "=r"(data)
+            : "volatile"
+        );
+    }
+}
+
+//////////////////////////////////////////////////////
+//lang_items
+//////////////////////////////////////////////////////
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 #[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {}  }
@@ -19,7 +44,9 @@ extern "rust-intrinsic" {
     pub fn size_of<T>() -> uint;
 }
 
-
+//////////////////////////////////////////////////////
+//structs, traits, enums, impls
+//////////////////////////////////////////////////////
 pub enum Option<T> {
     None,
     Some(T)
@@ -46,7 +73,9 @@ impl Iterator<int> for IntRange{
         }
     }
 }
-
+//////////////////////////////////////////////////////
+//macros
+//////////////////////////////////////////////////////
 #[macro_export]
 macro_rules! range{
     ($e1: expr, $e2: expr) => ( 
@@ -65,9 +94,6 @@ macro_rules! range{
         IntRange {cur: $e1, max: $e2, inc: $e3}
     );
 }
-
-
-
 ///////////////////////////////////////////////////////
 //MEMORY
 //////////////////////////////////////////////////////

@@ -4,6 +4,7 @@
 #![feature(globs)]
 #![feature(intrinsics)]
 #![feature(macro_rules)]
+#![feature(asm)]
 
 pub mod utils;
 pub mod io;
