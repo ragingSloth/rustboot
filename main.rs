@@ -1,9 +1,7 @@
 #![no_std]
 #![allow(ctypes)]
 #![feature(lang_items)]
-#![feature(globs)]
 #![feature(intrinsics)]
-#![feature(macro_rules)]
 #![feature(asm)]
 
 pub mod utils;

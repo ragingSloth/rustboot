@@ -2,6 +2,7 @@ pub use self::Colors::*;
 
 use utils::{transmute, IntRange};
 
+#[deriving(Copy)]
 pub enum Colors {
     Black      = 0,
     Blue       = 1,
@@ -21,6 +22,7 @@ pub enum Colors {
     White      = 15,
 }
 
+#[deriving(Copy)]
 pub struct Cell {
     pub x: int,
     pub y: int,

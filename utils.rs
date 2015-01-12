@@ -3,24 +3,25 @@ pub use self::Option::*;
 
 pub fn outb(addr: u8, data: u8) {
     unsafe {
-        asm!("outb $0, $1",
+        asm!("outb %al, %dx"
             :
-            : "r"(addr), "r"(data)
+            : "{dx}"(addr), "{al}"(data)
             :
             : "volatile"
         );
     }
 }
 pub fn inb(addr: u8) -> u8 {
+    let mut data: u8 = 0;
     unsafe {
-        let mu
-        asm!("outb $0, $1",
+        asm!("inb %dx, %al"
+            : "={al}"(data)
+            : "{dx}"(addr)
             :
-            : "r"(addr)
-            : "=r"(data)
             : "volatile"
         );
     }
+    data
 }
 
 //////////////////////////////////////////////////////
@@ -30,9 +31,9 @@ pub fn inb(addr: u8) -> u8 {
 #[lang = "eh_personality"] extern fn eh_personality() {}
 #[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {}  }
 #[lang="sized"]
-pub trait Sized for Sized? {}
+pub trait Sized {}
 #[lang="copy"]
-pub trait Copy for Sized? {}
+pub trait Copy {}
 #[lang="iterator"]
 pub trait Iterator<T>{
     fn next(&mut self) -> Option<T>;
@@ -62,7 +63,7 @@ impl Iterator<int> for IntRange{
     #[no_stack_check]
     fn next(&mut self) -> Option<int> {
         if self.cur != self.max {
-            if self.cur > self.max == self.inc >0 {
+            if (self.cur > self.max) == (self.inc > 0) {
                 self.cur = self.max;
                 self.inc = 0;
             }
