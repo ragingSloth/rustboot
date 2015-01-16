@@ -1,6 +1,6 @@
 [BITS 32]
 %include "gdt.asm"
-;%include "isr.asm"
+%include "isr.asm"
 global start
 start:
     mov esp, _sys_stack

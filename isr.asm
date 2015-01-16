@@ -53,12 +53,12 @@ isr_stub:
     push fs
     push gs
 
-    mov ax 0x10
+    mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
-    mox eax, esp
+    mov eax, esp
     push eax
     
     extern _fault_handler

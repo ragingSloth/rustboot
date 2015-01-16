@@ -1,5 +1,8 @@
-#![macro_escape]
-pub use self::Option::*;
+#![macro_use]
+use core;
+use core::prelude::{Option, None, Some};
+//use idt;
+use io;
 
 pub fn outb(addr: u8, data: u8) {
     unsafe {
@@ -21,8 +24,7 @@ pub fn inb(addr: u8) -> u8 {
             : "volatile"
         );
     }
-    data
-}
+    data } 
 
 //////////////////////////////////////////////////////
 //lang_items
@@ -30,38 +32,27 @@ pub fn inb(addr: u8) -> u8 {
 #[lang = "stack_exhausted"] extern fn stack_exhausted() {}
 #[lang = "eh_personality"] extern fn eh_personality() {}
 #[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {}  }
-#[lang="sized"]
-pub trait Sized {}
-#[lang="copy"]
-pub trait Copy {}
-#[lang="iterator"]
-pub trait Iterator<T>{
-    fn next(&mut self) -> Option<T>;
-}
 
 extern "rust-intrinsic" {
     pub fn transmute<T, U>(x: T) -> U;
-    pub fn offset<T>(dst: *const T, offset: int) -> *const T;
-    pub fn size_of<T>() -> uint;
+    pub fn offset<T>(dst: *const T, offset: isize) -> *const T;
+    pub fn size_of<T>() -> usize;
 }
 
 //////////////////////////////////////////////////////
 //structs, traits, enums, impls
 //////////////////////////////////////////////////////
-pub enum Option<T> {
-    None,
-    Some(T)
-}
-
 pub struct IntRange {
-    pub cur: int,
-    pub max: int,
-    pub inc: int,
+    pub cur: isize,
+    pub max: isize,
+    pub inc: isize,
 }
 
-impl Iterator<int> for IntRange{
+impl core::iter::Iterator for IntRange{
+    type Item = isize;
+
     #[no_stack_check]
-    fn next(&mut self) -> Option<int> {
+    fn next(&mut self) -> Option<isize> {
         if self.cur != self.max {
             if (self.cur > self.max) == (self.inc > 0) {
                 self.cur = self.max;
@@ -100,18 +91,18 @@ macro_rules! range{
 //////////////////////////////////////////////////////
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8, n: uint) {
-    for i in range!(n as int) {
+pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8, n: usize) {
+    for i in range!(n as isize) {
         *(offset(dest as *const u8, i) as *mut u8) = *offset(src, i);
     }
 }
 
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: uint) {
+pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: usize) {
     let mut block = match src < dest as *const u8 {
-        true => range!((n as int) - 1, -1),
-        false => range!(n as int),
+        true => range!((n as isize) - 1, -1),
+        false => range!(n as isize),
     };
     for i in block {
         *(offset(dest as *const u8, i) as *mut u8) = *offset(src, i);
@@ -120,8 +111,8 @@ pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: uint) {
 
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memset( s: *mut u8, c: i32, n: uint) -> *mut u8 {
-    for i in range!(n as int) {
+pub unsafe extern fn memset( s: *mut u8, c: i32, n: usize) -> *mut u8 {
+    for i in range!(n as isize) {
         *(offset(s as *const u8, i) as *mut u8) = c as u8;
     }
     return s;
@@ -129,8 +120,8 @@ pub unsafe extern fn memset( s: *mut u8, c: i32, n: uint) -> *mut u8 {
 
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memcmp(s1: *const u8, s2: *const u8, n: uint) -> i32 {
-    for i in range!(n as int) {
+pub unsafe extern fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
+    for i in range!(n as isize) {
         let a = *offset(s1, i);
         let b = *offset(s2, i);
         if a != b {
