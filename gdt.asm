@@ -1,4 +1,7 @@
-section .data
+gdtr:
+    dw (gdt_end - gdt) + 1 ;size
+    dd gdt           ;offset
+
 gdt:
     dq 0
     ;null segment for segfaults
@@ -16,13 +19,13 @@ gdt:
     db 0b10010010
     db 0x4F
     db 0
-gdtr:
-    dw ($ - gdt) + 1 ;size
-    dd gdt           ;offset
-section .text
+
+gdt_end:
+
 load_gdt:
     cli
     mov ax, 0x10 ;number of bytes into gdtr to look for address
+;    xor ax, ax
     mov ds, ax
     mov es, ax
     mov fs, ax

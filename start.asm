@@ -29,11 +29,12 @@ mboot:
     dd end
     dd start
 stub:
+    cli
     call load_gdt
     call _load_idt
     lidt [idtr]
+    ret
     sti
-    and ax, ax
     call main
     jmp $
 
