@@ -6,7 +6,7 @@ QEMU=qemu-system-i386
 RUSTCFLAGS= -L . -O --target i686-unknown-linux-gnu --crate-type lib -C relocation-model=static
 
 .SUFFIXES: .o .rs .asm
-.PHONY: clean run
+.PHONY: clean run reset
 
 all: kernel.bin
 
@@ -21,11 +21,14 @@ libcore.rlib:
 main.o: main.rs libcore.rlib
 	$(RUSTC) $(RUSTCFLAGS) -o $@ --emit obj $<
 
-kernel.bin: start.o main.o
+kernel.bin: start.o main.o 
 	$(LD) -melf_i386 -Tlink.ld -o $@ $^
 
 
 clean:
+	rm -rf *.o *.iso kernel.bin
+
+reset:
 	rm -rf *.o *.iso kernel.bin *.rlib
 
 run: kernel.bin

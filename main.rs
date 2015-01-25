@@ -3,7 +3,7 @@
 #![feature(lang_items)]
 #![feature(intrinsics)]
 #![feature(asm)]
-pub extern crate core;
+extern crate core;
 
 pub mod std {pub use core::*;}
 pub mod utils;

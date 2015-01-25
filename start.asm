@@ -2,6 +2,9 @@
 %include "gdt.asm"
 %include "isr.asm"
 global start
+global idtr
+extern main
+extern _load_idt
 start:
     mov esp, _sys_stack
     jmp stub
@@ -26,8 +29,11 @@ mboot:
     dd end
     dd start
 stub:
-    extern main
     call load_gdt
+    call _load_idt
+    lidt [idtr]
+    sti
+    and ax, ax
     call main
     jmp $
 
@@ -35,3 +41,7 @@ stub:
 SECTION .bss
     resb 8192
 _sys_stack:
+
+idtr:
+    dw 0
+    dd 0
