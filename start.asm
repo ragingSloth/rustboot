@@ -1,8 +1,6 @@
 [BITS 32]
-%include "gdt.asm"
 %include "isr.asm"
-extern main
-extern _load_idt
+%include "gdt.asm"
 
 global start
 start:
@@ -34,13 +32,15 @@ mboot:
     dd end
     dd start
 stub:
-    call load_gdt
+    extern main
+    extern _load_gdt
+    extern _load_idt
+    call _load_gdt
     call _load_idt
     lidt [idtr]
     sti
     call main
     jmp $
-
 
 SECTION .bss
     resb 8192

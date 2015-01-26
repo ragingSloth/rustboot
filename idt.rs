@@ -23,25 +23,25 @@ struct IDTR {
 
 #[repr(C, packed)]
 pub struct Regs {
-    gs: usize,
-    fs: usize,
-    es: usize,
-    ds: usize,
-    edi: usize,
-    esi: usize,
-    ebp: usize,
-    esp: usize,
-    ebx: usize,
-    edx: usize,
-    ecx: usize,
-    eax: usize,
-    int_no: usize,
-    err_no: usize,
-    eip: usize,
-    cs: usize,
-    eflags: usize,
-    useresp: usize,
-    ss: usize,
+    gs: u32,
+    fs: u32,
+    es: u32,
+    ds: u32,
+    edi: u32,
+    esi: u32,
+    ebp: u32,
+    esp: u32,
+    ebx: u32,
+    edx: u32,
+    ecx: u32,
+    eax: u32,
+    int_no: u32,
+    err_no: u32,
+    eip: u32,
+    cs: u32,
+    eflags: u32,
+    useresp: u32,
+    ss: u32,
 }
 
 #[no_mangle]
@@ -118,7 +118,7 @@ pub extern "C" fn _fault_handler(stack: Regs){
             bg : io::Black as u16,
             fg : io::White as u16, 
         };
-        unsafe{x.puts(*MESSAGES.get_unchecked(idx));}
+        unsafe{x.puts(*messages.get_unchecked(idx as usize));}
         x.puts("Exception, halting...");
         loop {}
     }
@@ -131,7 +131,7 @@ pub extern "C" fn _irq_handler(stack: Regs) {
         utils::outb(0xA0, 0x20);
     }
     utils::outb(0x20, 0x20);
-    let callback = unsafe {_irq_routines.get_unchecked(stack.int_no)};
+    let callback = unsafe {_irq_routines.get_unchecked(stack.int_no as usize)};
     match *callback {
         None => (),
         Some(funk) => unsafe {funk(stack)},

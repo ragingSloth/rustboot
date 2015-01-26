@@ -10,6 +10,7 @@ pub mod std {pub use core::*;}
 pub mod utils;
 pub mod io;
 pub mod idt;
+pub mod gdt;
 
 
 #[no_mangle]
