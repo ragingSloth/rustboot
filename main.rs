@@ -17,12 +17,12 @@ pub mod gdt;
 #[no_stack_check]
 pub extern "C" fn main() {
     io::clear_screen(io::Black);
-    //let mut x = io::Cell {
-    //    x : -1,
-    //    y : 0,
-    //    bg : io::Black as u16,
-    //    fg : io::White as u16, 
-    //};
-    //x.puts("hello world!\nwow");
+    let mut x = io::Cell {
+        x : -1,
+        y : 0,
+        bg : io::Black as u16,
+        fg : io::White as u16, 
+    };
+    x.puts("hello world!\nwow");
     loop {}
 }

@@ -45,8 +45,6 @@ pub struct Regs {
 }
 
 #[no_mangle]
-extern {static mut idtr: IDTR;}
-#[no_mangle]
 static mut idt: [IDT; 256] = [IDT {base1: 0, selector: 0, zero: 0, attrs: 0, base2: 0} ;256];
 
 static mut isrs: [unsafe extern "C" fn(); 32] = [_isr0, _isr1, _isr2, _isr3, _isr4, _isr5, _isr6, _isr7, _isr8, _isr9, _isr10, _isr11, _isr12, _isr13, _isr14, _isr15, _isr16, _isr17, _isr18, _isr19, _isr20, _isr21, _isr22, _isr23, _isr24, _isr25, _isr26, _isr27, _isr28, _isr29, _isr30, _isr31];
@@ -120,7 +118,7 @@ pub extern "C" fn _fault_handler(stack: Regs){
             bg : io::Black as u16,
             fg : io::White as u16, 
         };
-        unsafe{x.puts(*messages.get_unchecked(idx as usize));}
+        unsafe{x.puts(*MESSAGES.get_unchecked(idx as usize));}
         x.puts("Exception, halting...");
         loop {}
     }
@@ -152,6 +150,7 @@ fn set_descriptor(desc: &mut IDT, offset: u32, selector: u16, config: u8){
 //ISRs
 /////////////////
 extern {
+    static mut idtr: IDTR;
     fn _isr0();
     fn _isr1();
     fn _isr2();

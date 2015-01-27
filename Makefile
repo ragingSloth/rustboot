@@ -14,9 +14,7 @@ all: kernel.bin
 	$(NASM) -f aout -o $@ $<
 
 libcore.rlib: 
-	cp libcore.rs libcore/lib.rs
 	$(RUSTC) $(RUSTCFLAGS) libcore/lib.rs
-	mv libcore/lib.rs ./
 
 main.o: main.rs libcore.rlib
 	$(RUSTC) $(RUSTCFLAGS) -o $@ --emit obj $<

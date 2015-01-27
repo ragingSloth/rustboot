@@ -1,6 +1,9 @@
 [BITS 32]
 %include "isr.asm"
 %include "gdt.asm"
+extern main
+extern _load_gdt
+extern _load_idt
 
 global start
 start:
@@ -32,10 +35,7 @@ mboot:
     dd end
     dd start
 stub:
-    extern main
-    extern _load_gdt
-    extern _load_idt
-    ;call _load_gdt
+    call _load_gdt
     call _load_idt
     lidt [idtr]
     sti
