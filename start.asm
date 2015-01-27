@@ -35,7 +35,7 @@ stub:
     extern main
     extern _load_gdt
     extern _load_idt
-    call _load_gdt
+    ;call _load_gdt
     call _load_idt
     lidt [idtr]
     sti

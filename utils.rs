@@ -1,8 +1,7 @@
 #![macro_use]
 use core;
 use core::prelude::{Option, None, Some};
-//use idt;
-use io;
+use core::ptr::PtrExt;
 
 pub fn outb(addr: u8, data: u8) {
     unsafe {
@@ -91,29 +90,36 @@ macro_rules! range{
 //////////////////////////////////////////////////////
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8, n: usize) {
-    for i in range!(n as isize) {
-        *(offset(dest as *const u8, i) as *mut u8) = *offset(src, i);
+pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8{
+    for i in 0..n {
+        *dest.offset(i as isize) = *src.offset(i as isize);
     }
+    return dest;
 }
 
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: usize) {
-    let mut block = match src < dest as *const u8 {
-        true => range!((n as isize) - 1, -1),
-        false => range!(n as isize),
+pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: usize)  -> *mut u8{
+    let mut incr = match src < dest as *const u8 {
+        true => {
+            for i in 0..n {
+                *dest.offset((n - i) as isize) = *src.offset((n - i) as isize);
+            }
+        },
+        false => {
+            for i in 0..n {
+                *dest.offset(i as isize) = *src.offset(i as isize);
+            }
+        },
     };
-    for i in block {
-        *(offset(dest as *const u8, i) as *mut u8) = *offset(src, i);
-    }
+    return dest;
 }
 
 #[no_mangle]
 #[no_stack_check]
 pub unsafe extern fn memset( s: *mut u8, c: i32, n: usize) -> *mut u8 {
-    for i in range!(n as isize) {
-        *(offset(s as *const u8, i) as *mut u8) = c as u8;
+    for i in 0..n {
+        *s.offset(i as isize) = c as u8;
     }
     return s;
 }
@@ -121,9 +127,9 @@ pub unsafe extern fn memset( s: *mut u8, c: i32, n: usize) -> *mut u8 {
 #[no_mangle]
 #[no_stack_check]
 pub unsafe extern fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
-    for i in range!(n as isize) {
-        let a = *offset(s1, i);
-        let b = *offset(s2, i);
+    for i in 0..n {
+        let a = *s1.offset(i as isize);
+        let b = *s2.offset(i as isize);
         if a != b {
             return  (a - b) as i32;
         }
