@@ -27,9 +27,10 @@
 
 use clone::Clone;
 
-/// Types able to be transferred across task boundaries.
+/// Types able to be transferred across thread boundaries.
 #[unstable = "will be overhauled with new lifetime rules; see RFC 458"]
 #[lang="send"]
+#[rustc_on_unimplemented = "`{Self}` cannot be sent between threads safely"]
 pub unsafe trait Send: 'static {
     // empty.
 }
@@ -37,22 +38,121 @@ pub unsafe trait Send: 'static {
 /// Types with a constant size known at compile-time.
 #[stable]
 #[lang="sized"]
+#[rustc_on_unimplemented = "`{Self}` does not have a constant size known at compile-time"]
 pub trait Sized {
     // Empty.
 }
 
 /// Types that can be copied by simply copying bits (i.e. `memcpy`).
+///
+/// By default, variable bindings have 'move semantics.' In other
+/// words:
+///
+/// ```
+/// #[derive(Show)]
+/// struct Foo;
+///
+/// let x = Foo;
+///
+/// let y = x;
+///
+/// // `x` has moved into `y`, and so cannot be used
+///
+/// // println!("{:?}", x); // error: use of moved value
+/// ```
+///
+/// However, if a type implements `Copy`, it instead has 'copy semantics':
+///
+/// ```
+/// // we can just derive a `Copy` implementation
+/// #[derive(Show, Copy)]
+/// struct Foo;
+///
+/// let x = Foo;
+///
+/// let y = x;
+///
+/// // `y` is a copy of `x`
+///
+/// println!("{:?}", x); // A-OK!
+/// ```
+///
+/// It's important to note that in these two examples, the only difference is if you are allowed to
+/// access `x` after the assignment: a move is also a bitwise copy under the hood.
+///
+/// ## When can my type be `Copy`?
+///
+/// A type can implement `Copy` if all of its components implement `Copy`. For example, this
+/// `struct` can be `Copy`:
+///
+/// ```
+/// struct Point {
+///    x: i32,
+///    y: i32,
+/// }
+/// ```
+///
+/// A `struct` can be `Copy`, and `i32` is `Copy`, so therefore, `Point` is eligible to be `Copy`.
+///
+/// ```
+/// # struct Point;
+/// struct PointList {
+///     points: Vec<Point>,
+/// }
+/// ```
+///
+/// The `PointList` `struct` cannot implement `Copy`, because `Vec<T>` is not `Copy`. If we
+/// attempt to derive a `Copy` implementation, we'll get an error.
+///
+/// ```text
+/// error: the trait `Copy` may not be implemented for this type; field `points` does not implement
+/// `Copy`
+/// ```
+///
+/// ## How can I implement `Copy`?
+///
+/// There are two ways to implement `Copy` on your type:
+///
+/// ```
+/// #[derive(Copy)]
+/// struct MyStruct;
+/// ```
+///
+/// and
+///
+/// ```
+/// struct MyStruct;
+/// impl Copy for MyStruct {}
+/// ```
+///
+/// There is a small difference between the two: the `derive` strategy will also place a `Copy`
+/// bound on type parameters, which isn't always desired.
+///
+/// ## When can my type _not_ be `Copy`?
+///
+/// Some types can't be copied safely. For example, copying `&mut T` would create an aliased
+/// mutable reference, and copying `String` would result in two attempts to free the same buffer.
+///
+/// Generalizing the latter case, any type implementing `Drop` can't be `Copy`, because it's
+/// managing some resource besides its own `size_of::<T>()` bytes.
+///
+/// ## When should my type be `Copy`?
+///
+/// Generally speaking, if your type _can_ implement `Copy`, it should. There's one important thing
+/// to consider though: if you think your type may _not_ be able to implement `Copy` in the future,
+/// then it might be prudent to not implement `Copy`. This is because removing `Copy` is a breaking
+/// change: that second example would fail to compile if we made `Foo` non-`Copy`.
 #[stable]
 #[lang="copy"]
 pub trait Copy {
     // Empty.
 }
 
-/// Types that can be safely shared between tasks when aliased.
+/// Types that can be safely shared between threads when aliased.
 ///
 /// The precise definition is: a type `T` is `Sync` if `&T` is
 /// thread-safe. In other words, there is no possibility of data races
-/// when passing `&T` references between tasks.
+/// when passing `&T` references between threads.
 ///
 /// As one would expect, primitive types like `u8` and `f64` are all
 /// `Sync`, and so are simple aggregate types containing them (like
@@ -95,6 +195,7 @@ pub trait Copy {
 /// `transmute`-ing from `&T` to `&mut T` is illegal).
 #[unstable = "will be overhauled with new lifetime rules; see RFC 458"]
 #[lang="sync"]
+#[rustc_on_unimplemented = "`{Self}` cannot be shared between threads safely"]
 pub unsafe trait Sync {
     // Empty
 }
@@ -210,8 +311,7 @@ impl<T: ?Sized> Clone for ContravariantType<T> {
 /// "interior" mutability:
 ///
 /// ```
-/// pub struct Cell<T> { value: T }
-/// # fn main() {}
+/// struct Cell<T> { value: T }
 /// ```
 ///
 /// The type system would infer that `value` is only read here and
@@ -279,15 +379,6 @@ pub struct ContravariantLifetime<'a>;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InvariantLifetime<'a>;
 
-/// A type which is considered "not sendable", meaning that it cannot
-/// be safely sent between tasks, even if it is owned. This is
-/// typically embedded in other types, such as `Gc`, to ensure that
-/// their instances remain thread-local.
-#[unstable = "likely to change with new variance strategy"]
-#[lang="no_send_bound"]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NoSend;
-
 /// A type which is considered "not POD", meaning that it is not
 /// implicitly copyable. This is typically embedded in other types to
 /// ensure that they are never copied, even if they lack a destructor.
@@ -296,14 +387,6 @@ pub struct NoSend;
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(missing_copy_implementations)]
 pub struct NoCopy;
-
-/// A type which is considered "not sync", meaning that
-/// its contents are not threadsafe, hence they cannot be
-/// shared between tasks.
-#[unstable = "likely to change with new variance strategy"]
-#[lang="no_sync_bound"]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NoSync;
 
 /// A type which is considered managed by the GC. This is typically
 /// embedded in other types.

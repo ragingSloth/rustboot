@@ -67,9 +67,6 @@ use raw::Slice as RawSlice;
 pub trait SliceExt {
     type Item;
 
-    fn slice<'a>(&'a self, start: uint, end: uint) -> &'a [Self::Item];
-    fn slice_from<'a>(&'a self, start: uint) -> &'a [Self::Item];
-    fn slice_to<'a>(&'a self, end: uint) -> &'a [Self::Item];
     fn split_at<'a>(&'a self, mid: uint) -> (&'a [Self::Item], &'a [Self::Item]);
     fn iter<'a>(&'a self) -> Iter<'a, Self::Item>;
     fn split<'a, P>(&'a self, pred: P) -> Split<'a, Self::Item, P>
@@ -93,9 +90,6 @@ pub trait SliceExt {
     fn is_empty(&self) -> bool { self.len() == 0 }
     fn get_mut<'a>(&'a mut self, index: uint) -> Option<&'a mut Self::Item>;
     fn as_mut_slice<'a>(&'a mut self) -> &'a mut [Self::Item];
-    fn slice_mut<'a>(&'a mut self, start: uint, end: uint) -> &'a mut [Self::Item];
-    fn slice_from_mut<'a>(&'a mut self, start: uint) -> &'a mut [Self::Item];
-    fn slice_to_mut<'a>(&'a mut self, end: uint) -> &'a mut [Self::Item];
     fn iter_mut<'a>(&'a mut self) -> IterMut<'a, Self::Item>;
     fn first_mut<'a>(&'a mut self) -> Option<&'a mut Self::Item>;
     fn tail_mut<'a>(&'a mut self) -> &'a mut [Self::Item];
@@ -136,30 +130,8 @@ impl<T> SliceExt for [T] {
     type Item = T;
 
     #[inline]
-    fn slice(&self, start: uint, end: uint) -> &[T] {
-        assert!(start <= end);
-        assert!(end <= self.len());
-        unsafe {
-            transmute(RawSlice {
-                data: self.as_ptr().offset(start as int),
-                len: (end - start)
-            })
-        }
-    }
-
-    #[inline]
-    fn slice_from(&self, start: uint) -> &[T] {
-        self.slice(start, self.len())
-    }
-
-    #[inline]
-    fn slice_to(&self, end: uint) -> &[T] {
-        self.slice(0, end)
-    }
-
-    #[inline]
     fn split_at(&self, mid: uint) -> (&[T], &[T]) {
-        (&self[0..mid], &self[mid..])
+        (&self[..mid], &self[mid..])
     }
 
     #[inline]
@@ -240,7 +212,7 @@ impl<T> SliceExt for [T] {
 
     #[inline]
     fn init(&self) -> &[T] {
-        &self[0..(self.len() - 1)]
+        &self[..self.len() - 1]
     }
 
     #[inline]
@@ -291,20 +263,6 @@ impl<T> SliceExt for [T] {
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] { self }
 
-    fn slice_mut(&mut self, start: uint, end: uint) -> &mut [T] {
-        ops::IndexMut::index_mut(self, &ops::Range { start: start, end: end } )
-    }
-
-    #[inline]
-    fn slice_from_mut(&mut self, start: uint) -> &mut [T] {
-        ops::IndexMut::index_mut(self, &ops::RangeFrom { start: start } )
-    }
-
-    #[inline]
-    fn slice_to_mut(&mut self, end: uint) -> &mut [T] {
-        ops::IndexMut::index_mut(self, &ops::RangeTo { end: end } )
-    }
-
     #[inline]
     fn split_at_mut(&mut self, mid: uint) -> (&mut [T], &mut [T]) {
         unsafe {
@@ -345,13 +303,13 @@ impl<T> SliceExt for [T] {
 
     #[inline]
     fn tail_mut(&mut self) -> &mut [T] {
-        self.slice_from_mut(1)
+        &mut self[1 ..]
     }
 
     #[inline]
     fn init_mut(&mut self) -> &mut [T] {
         let len = self.len();
-        self.slice_to_mut(len-1)
+        &mut self[.. (len - 1)]
     }
 
     #[inline]
@@ -443,13 +401,13 @@ impl<T> SliceExt for [T] {
     #[inline]
     fn starts_with(&self, needle: &[T]) -> bool where T: PartialEq {
         let n = needle.len();
-        self.len() >= n && needle == &self[0..n]
+        self.len() >= n && needle == &self[..n]
     }
 
     #[inline]
     fn ends_with(&self, needle: &[T]) -> bool where T: PartialEq {
         let (m, n) = (self.len(), needle.len());
-        m >= n && needle == &self[(m-n)..]
+        m >= n && needle == &self[m-n..]
     }
 
     #[unstable]
@@ -483,7 +441,7 @@ impl<T> SliceExt for [T] {
         self.swap(j, i-1);
 
         // Step 4: Reverse the (previously) weakly decreasing part
-        self.slice_from_mut(i).reverse();
+        self[i..].reverse();
 
         true
     }
@@ -505,7 +463,7 @@ impl<T> SliceExt for [T] {
         }
 
         // Step 2: Reverse the weakly increasing part
-        self.slice_from_mut(i).reverse();
+        self[i..].reverse();
 
         // Step 3: Find the rightmost element equal to or bigger than the pivot (i-1)
         let mut j = self.len() - 1;
@@ -522,8 +480,8 @@ impl<T> SliceExt for [T] {
     #[inline]
     fn clone_from_slice(&mut self, src: &[T]) -> uint where T: Clone {
         let min = cmp::min(self.len(), src.len());
-        let dst = self.slice_to_mut(min);
-        let src = src.slice_to(min);
+        let dst = &mut self[.. min];
+        let src = &src[.. min];
         for i in range(0, min) {
             dst[i].clone_from(&src[i]);
         }
@@ -531,6 +489,7 @@ impl<T> SliceExt for [T] {
     }
 }
 
+#[stable]
 impl<T> ops::Index<uint> for [T] {
     type Output = T;
 
@@ -541,6 +500,7 @@ impl<T> ops::Index<uint> for [T] {
     }
 }
 
+#[stable]
 impl<T> ops::IndexMut<uint> for [T] {
     type Output = T;
 
@@ -551,6 +511,7 @@ impl<T> ops::IndexMut<uint> for [T] {
     }
 }
 
+#[stable]
 impl<T> ops::Index<ops::Range<uint>> for [T] {
     type Output = [T];
     #[inline]
@@ -565,6 +526,7 @@ impl<T> ops::Index<ops::Range<uint>> for [T] {
         }
     }
 }
+#[stable]
 impl<T> ops::Index<ops::RangeTo<uint>> for [T] {
     type Output = [T];
     #[inline]
@@ -572,6 +534,7 @@ impl<T> ops::Index<ops::RangeTo<uint>> for [T] {
         self.index(&ops::Range{ start: 0, end: index.end })
     }
 }
+#[stable]
 impl<T> ops::Index<ops::RangeFrom<uint>> for [T] {
     type Output = [T];
     #[inline]
@@ -579,6 +542,7 @@ impl<T> ops::Index<ops::RangeFrom<uint>> for [T] {
         self.index(&ops::Range{ start: index.start, end: self.len() })
     }
 }
+#[stable]
 impl<T> ops::Index<ops::FullRange> for [T] {
     type Output = [T];
     #[inline]
@@ -587,6 +551,7 @@ impl<T> ops::Index<ops::FullRange> for [T] {
     }
 }
 
+#[stable]
 impl<T> ops::IndexMut<ops::Range<uint>> for [T] {
     type Output = [T];
     #[inline]
@@ -601,6 +566,7 @@ impl<T> ops::IndexMut<ops::Range<uint>> for [T] {
         }
     }
 }
+#[stable]
 impl<T> ops::IndexMut<ops::RangeTo<uint>> for [T] {
     type Output = [T];
     #[inline]
@@ -608,6 +574,7 @@ impl<T> ops::IndexMut<ops::RangeTo<uint>> for [T] {
         self.index_mut(&ops::Range{ start: 0, end: index.end })
     }
 }
+#[stable]
 impl<T> ops::IndexMut<ops::RangeFrom<uint>> for [T] {
     type Output = [T];
     #[inline]
@@ -616,6 +583,7 @@ impl<T> ops::IndexMut<ops::RangeFrom<uint>> for [T] {
         self.index_mut(&ops::Range{ start: index.start, end: len })
     }
 }
+#[stable]
 impl<T> ops::IndexMut<ops::FullRange> for [T] {
     type Output = [T];
     #[inline]
@@ -685,7 +653,7 @@ macro_rules! iterator {
                             self.ptr = transmute(self.ptr as uint + 1);
 
                             // Use a non-null pointer value
-                            Some(transmute(1u))
+                            Some(&mut *(1 as *mut _))
                         } else {
                             let old = self.ptr;
                             self.ptr = self.ptr.offset(1);
@@ -719,7 +687,7 @@ macro_rules! iterator {
                             self.end = transmute(self.end as uint - 1);
 
                             // Use a non-null pointer value
-                            Some(transmute(1u))
+                            Some(&mut *(1 as *mut _))
                         } else {
                             self.end = self.end.offset(-1);
 
@@ -741,7 +709,7 @@ macro_rules! make_slice {
             diff / mem::size_of::<$t>()
         };
         unsafe {
-            transmute::<_, $result>(RawSlice { data: $start as *const T, len: len })
+            transmute::<_, $result>(RawSlice { data: $start, len: len })
         }
     }}
 }
@@ -827,7 +795,7 @@ impl<'a, T> RandomAccessIterator for Iter<'a, T> {
             if index < self.indexable() {
                 if mem::size_of::<T>() == 0 {
                     // Use a non-null pointer value
-                    Some(transmute(1u))
+                    Some(&mut *(1 as *mut _))
                 } else {
                     Some(transmute(self.ptr.offset(index as int)))
                 }
@@ -972,8 +940,8 @@ impl<'a, T, P> Iterator for Split<'a, T, P> where P: FnMut(&T) -> bool {
         match self.v.iter().position(|x| (self.pred)(x)) {
             None => self.finish(),
             Some(idx) => {
-                let ret = Some(&self.v[0..idx]);
-                self.v = &self.v[(idx + 1)..];
+                let ret = Some(&self.v[..idx]);
+                self.v = &self.v[idx + 1..];
                 ret
             }
         }
@@ -998,8 +966,8 @@ impl<'a, T, P> DoubleEndedIterator for Split<'a, T, P> where P: FnMut(&T) -> boo
         match self.v.iter().rposition(|x| (self.pred)(x)) {
             None => self.finish(),
             Some(idx) => {
-                let ret = Some(&self.v[(idx + 1)..]);
-                self.v = &self.v[0..idx];
+                let ret = Some(&self.v[idx + 1..]);
+                self.v = &self.v[..idx];
                 ret
             }
         }
@@ -1051,7 +1019,7 @@ impl<'a, T, P> Iterator for SplitMut<'a, T, P> where P: FnMut(&T) -> bool {
             Some(idx) => {
                 let tmp = mem::replace(&mut self.v, &mut []);
                 let (head, tail) = tmp.split_at_mut(idx);
-                self.v = tail.slice_from_mut(1);
+                self.v = &mut tail[1..];
                 Some(head)
             }
         }
@@ -1087,7 +1055,7 @@ impl<'a, T, P> DoubleEndedIterator for SplitMut<'a, T, P> where
                 let tmp = mem::replace(&mut self.v, &mut []);
                 let (head, tail) = tmp.split_at_mut(idx);
                 self.v = head;
-                Some(tail.slice_from_mut(1))
+                Some(&mut tail[1..])
             }
         }
     }
@@ -1195,7 +1163,7 @@ impl<'a, T> Iterator for Windows<'a, T> {
         if self.size > self.v.len() {
             None
         } else {
-            let ret = Some(&self.v[0..self.size]);
+            let ret = Some(&self.v[..self.size]);
             self.v = &self.v[1..];
             ret
         }
@@ -1207,7 +1175,7 @@ impl<'a, T> Iterator for Windows<'a, T> {
             (0, Some(0))
         } else {
             let x = self.v.len() - self.size;
-            (x.saturating_add(1), x.checked_add(1u))
+            (x.saturating_add(1), x.checked_add(1))
         }
     }
 }
@@ -1268,6 +1236,9 @@ impl<'a, T> DoubleEndedIterator for Chunks<'a, T> {
         }
     }
 }
+
+#[stable]
+impl<'a, T> ExactSizeIterator for Chunks<'a, T> {}
 
 #[unstable = "trait is experimental"]
 impl<'a, T> RandomAccessIterator for Chunks<'a, T> {
@@ -1347,6 +1318,8 @@ impl<'a, T> DoubleEndedIterator for ChunksMut<'a, T> {
     }
 }
 
+#[stable]
+impl<'a, T> ExactSizeIterator for ChunksMut<'a, T> {}
 
 //
 // Free functions
@@ -1409,7 +1382,7 @@ pub unsafe fn from_raw_buf<'a, T>(p: &'a *const T, len: uint) -> &'a [T] {
 #[inline]
 #[unstable = "should be renamed to from_raw_parts_mut"]
 pub unsafe fn from_raw_mut_buf<'a, T>(p: &'a *mut T, len: uint) -> &'a mut [T] {
-    transmute(RawSlice { data: *p as *const T, len: len })
+    transmute(RawSlice { data: *p, len: len })
 }
 
 //

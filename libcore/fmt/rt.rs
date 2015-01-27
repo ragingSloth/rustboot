@@ -23,7 +23,7 @@ pub use self::Flag::*;
 
 #[doc(hidden)]
 #[derive(Copy)]
-pub struct Argument<'a> {
+pub struct Argument {
     pub position: Position,
     pub format: FormatSpec,
 }

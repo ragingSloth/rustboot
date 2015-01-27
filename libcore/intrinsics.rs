@@ -42,7 +42,6 @@
 #![unstable]
 #![allow(missing_docs)]
 
-#[cfg(not(stage0))]
 use marker::Sized;
 
 pub type GlueFn = extern "Rust" fn(*const i8);
@@ -198,16 +197,16 @@ extern "rust-intrinsic" {
     pub fn pref_align_of<T>() -> uint;
 
     /// Get a static pointer to a type descriptor.
+    #[cfg(not(stage0))]
+    pub fn get_tydesc<T: ?Sized>() -> *const TyDesc;
+
+    #[cfg(stage0)]
     pub fn get_tydesc<T>() -> *const TyDesc;
 
     /// Gets an identifier which is globally unique to the specified type. This
     /// function will return the same value for a type regardless of whichever
     /// crate it is invoked in.
-    #[cfg(not(stage0))]
-    pub fn type_id<T: ?Sized + 'static>() -> TypeId;
-
-    #[cfg(stage0)]
-    pub fn type_id<T: 'static>() -> TypeId;
+    pub fn type_id<T: ?Sized + 'static>() -> u64;
 
     /// Create a value initialized to zero.
     ///
@@ -545,28 +544,4 @@ extern "rust-intrinsic" {
     pub fn u32_mul_with_overflow(x: u32, y: u32) -> (u32, bool);
     /// Performs checked `u64` multiplication.
     pub fn u64_mul_with_overflow(x: u64, y: u64) -> (u64, bool);
-}
-
-
-/// `TypeId` represents a globally unique identifier for a type
-#[lang="type_id"] // This needs to be kept in lockstep with the code in trans/intrinsic.rs and
-                  // middle/lang_items.rs
-#[derive(Clone, Copy, PartialEq, Eq, Show)]
-pub struct TypeId {
-    t: u64,
-}
-
-impl TypeId {
-    /// Returns the `TypeId` of the type this generic function has been instantiated with
-    #[cfg(not(stage0))]
-    pub fn of<T: ?Sized + 'static>() -> TypeId {
-        unsafe { type_id::<T>() }
-    }
-
-    #[cfg(stage0)]
-    pub fn of<T: 'static>() -> TypeId {
-        unsafe { type_id::<T>() }
-    }
-
-    pub fn hash(&self) -> u64 { self.t }
 }

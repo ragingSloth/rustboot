@@ -20,8 +20,10 @@ use self::Searcher::{Naive, TwoWay, TwoWayLong};
 
 use cmp::{self, Eq};
 use default::Default;
-use iter::range;
+use error::Error;
+use fmt;
 use iter::ExactSizeIterator;
+use iter::range;
 use iter::{Map, Iterator, IteratorExt, DoubleEndedIterator};
 use marker::Sized;
 use mem;
@@ -196,9 +198,9 @@ pub unsafe fn from_utf8_unchecked<'a>(v: &'a [u8]) -> &'a str {
 #[deprecated = "use std::ffi::c_str_to_bytes + str::from_utf8"]
 pub unsafe fn from_c_str(s: *const i8) -> &'static str {
     let s = s as *const u8;
-    let mut len = 0u;
+    let mut len = 0;
     while *s.offset(len as int) != 0 {
-        len += 1u;
+        len += 1;
     }
     let v: &'static [u8] = ::mem::transmute(Slice { data: s, len: len });
     from_utf8(v).ok().expect("from_c_str passed invalid utf-8 data")
@@ -242,6 +244,30 @@ impl<'a> CharEq for &'a [char] {
     }
 }
 
+#[stable]
+impl Error for Utf8Error {
+    fn description(&self) -> &str {
+        match *self {
+            Utf8Error::TooShort => "invalid utf-8: not enough bytes",
+            Utf8Error::InvalidByte(..) => "invalid utf-8: corrupt contents",
+        }
+    }
+}
+
+#[stable]
+impl fmt::Display for Utf8Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Utf8Error::InvalidByte(n) => {
+                write!(f, "invalid utf-8: invalid byte at index {}", n)
+            }
+            Utf8Error::TooShort => {
+                write!(f, "invalid utf-8: byte slice too short")
+            }
+        }
+    }
+}
+
 /*
 Section: Iterators
 */
@@ -279,43 +305,52 @@ fn unwrap_or_0(opt: Option<&u8>) -> u8 {
     }
 }
 
+/// Reads the next code point out of a byte iterator (assuming a
+/// UTF-8-like encoding).
+#[unstable]
+pub fn next_code_point(bytes: &mut slice::Iter<u8>) -> Option<u32> {
+    // Decode UTF-8
+    let x = match bytes.next() {
+        None => return None,
+        Some(&next_byte) if next_byte < 128 => return Some(next_byte as u32),
+        Some(&next_byte) => next_byte,
+    };
+
+    // Multibyte case follows
+    // Decode from a byte combination out of: [[[x y] z] w]
+    // NOTE: Performance is sensitive to the exact formulation here
+    let init = utf8_first_byte!(x, 2);
+    let y = unwrap_or_0(bytes.next());
+    let mut ch = utf8_acc_cont_byte!(init, y);
+    if x >= 0xE0 {
+        // [[x y z] w] case
+        // 5th bit in 0xE0 .. 0xEF is always clear, so `init` is still valid
+        let z = unwrap_or_0(bytes.next());
+        let y_z = utf8_acc_cont_byte!((y & CONT_MASK) as u32, z);
+        ch = init << 12 | y_z;
+        if x >= 0xF0 {
+            // [x y z w] case
+            // use only the lower 3 bits of `init`
+            let w = unwrap_or_0(bytes.next());
+            ch = (init & 7) << 18 | utf8_acc_cont_byte!(y_z, w);
+        }
+    }
+
+    Some(ch)
+}
+
 #[stable]
 impl<'a> Iterator for Chars<'a> {
     type Item = char;
 
     #[inline]
     fn next(&mut self) -> Option<char> {
-        // Decode UTF-8, using the valid UTF-8 invariant
-        let x = match self.iter.next() {
-            None => return None,
-            Some(&next_byte) if next_byte < 128 => return Some(next_byte as char),
-            Some(&next_byte) => next_byte,
-        };
-
-        // Multibyte case follows
-        // Decode from a byte combination out of: [[[x y] z] w]
-        // NOTE: Performance is sensitive to the exact formulation here
-        let init = utf8_first_byte!(x, 2);
-        let y = unwrap_or_0(self.iter.next());
-        let mut ch = utf8_acc_cont_byte!(init, y);
-        if x >= 0xE0 {
-            // [[x y z] w] case
-            // 5th bit in 0xE0 .. 0xEF is always clear, so `init` is still valid
-            let z = unwrap_or_0(self.iter.next());
-            let y_z = utf8_acc_cont_byte!((y & CONT_MASK) as u32, z);
-            ch = init << 12 | y_z;
-            if x >= 0xF0 {
-                // [x y z w] case
-                // use only the lower 3 bits of `init`
-                let w = unwrap_or_0(self.iter.next());
-                ch = (init & 7) << 18 | utf8_acc_cont_byte!(y_z, w);
+        next_code_point(&mut self.iter).map(|ch| {
+            // str invariant says `ch` is a valid Unicode Scalar Value
+            unsafe {
+                mem::transmute(ch)
             }
-        }
-
-        // str invariant says `ch` is a valid Unicode Scalar Value
-        unsafe {
-            Some(mem::transmute(ch))
-        }
+        })
     }
 
     #[inline]
@@ -678,18 +713,15 @@ struct TwoWaySearcher {
 */
 impl TwoWaySearcher {
     fn new(needle: &[u8]) -> TwoWaySearcher {
-        let (crit_pos1, period1) = TwoWaySearcher::maximal_suffix(needle, false);
-        let (crit_pos2, period2) = TwoWaySearcher::maximal_suffix(needle, true);
+        let (crit_pos_false, period_false) = TwoWaySearcher::maximal_suffix(needle, false);
+        let (crit_pos_true, period_true) = TwoWaySearcher::maximal_suffix(needle, true);
 
-        let crit_pos;
-        let period;
-        if crit_pos1 > crit_pos2 {
-            crit_pos = crit_pos1;
-            period = period1;
-        } else {
-            crit_pos = crit_pos2;
-            period = period2;
-        }
+        let (crit_pos, period) =
+            if crit_pos_false > crit_pos_true {
+                (crit_pos_false, period_false)
+            } else {
+                (crit_pos_true, period_true)
+            };
 
         // This isn't in the original algorithm, as far as I'm aware.
         let byteset = needle.iter()
@@ -701,10 +733,10 @@ impl TwoWaySearcher {
         //
         // What's going on is we have some critical factorization (u, v) of the
         // needle, and we want to determine whether u is a suffix of
-        // &v[0..period]. If it is, we use "Algorithm CP1". Otherwise we use
+        // &v[..period]. If it is, we use "Algorithm CP1". Otherwise we use
         // "Algorithm CP2", which is optimized for when the period of the needle
         // is large.
-        if &needle[0..crit_pos] == &needle[period.. period + crit_pos] {
+        if &needle[..crit_pos] == &needle[period.. period + crit_pos] {
             TwoWaySearcher {
                 crit_pos: crit_pos,
                 period: period,
@@ -905,13 +937,13 @@ impl<'a> Iterator for SplitStr<'a> {
 
         match self.it.next() {
             Some((from, to)) => {
-                let ret = Some(self.it.haystack.slice(self.last_end, from));
+                let ret = Some(&self.it.haystack[self.last_end .. from]);
                 self.last_end = to;
                 ret
             }
             None => {
                 self.finished = true;
-                Some(self.it.haystack.slice(self.last_end, self.it.haystack.len()))
+                Some(&self.it.haystack[self.last_end .. self.it.haystack.len()])
             }
         }
     }
@@ -1118,27 +1150,90 @@ mod traits {
         }
     }
 
+    /// Returns a slice of the given string from the byte range
+    /// [`begin`..`end`).
+    ///
+    /// This operation is `O(1)`.
+    ///
+    /// Panics when `begin` and `end` do not point to valid characters
+    /// or point beyond the last character of the string.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let s = "Löwe 老虎 Léopard";
+    /// assert_eq!(&s[0 .. 1], "L");
+    ///
+    /// assert_eq!(&s[1 .. 9], "öwe 老");
+    ///
+    /// // these will panic:
+    /// // byte 2 lies within `ö`:
+    /// // &s[2 ..3];
+    ///
+    /// // byte 8 lies within `老`
+    /// // &s[1 .. 8];
+    ///
+    /// // byte 100 is outside the string
+    /// // &s[3 .. 100];
+    /// ```
+    #[stable]
     impl ops::Index<ops::Range<uint>> for str {
         type Output = str;
         #[inline]
         fn index(&self, index: &ops::Range<uint>) -> &str {
-            self.slice(index.start, index.end)
+            // is_char_boundary checks that the index is in [0, .len()]
+            if index.start <= index.end &&
+               self.is_char_boundary(index.start) &&
+               self.is_char_boundary(index.end) {
+                unsafe { self.slice_unchecked(index.start, index.end) }
+            } else {
+                super::slice_error_fail(self, index.start, index.end)
+            }
         }
     }
+
+    /// Returns a slice of the string from the beginning to byte
+    /// `end`.
+    ///
+    /// Equivalent to `self[0 .. end]`.
+    ///
+    /// Panics when `end` does not point to a valid character, or is
+    /// out of bounds.
+    #[stable]
     impl ops::Index<ops::RangeTo<uint>> for str {
         type Output = str;
         #[inline]
         fn index(&self, index: &ops::RangeTo<uint>) -> &str {
-            self.slice_to(index.end)
+            // is_char_boundary checks that the index is in [0, .len()]
+            if self.is_char_boundary(index.end) {
+                unsafe { self.slice_unchecked(0, index.end) }
+            } else {
+                super::slice_error_fail(self, 0, index.end)
+            }
         }
     }
+
+    /// Returns a slice of the string from `begin` to its end.
+    ///
+    /// Equivalent to `self[begin .. self.len()]`.
+    ///
+    /// Panics when `begin` does not point to a valid character, or is
+    /// out of bounds.
+    #[stable]
     impl ops::Index<ops::RangeFrom<uint>> for str {
         type Output = str;
         #[inline]
         fn index(&self, index: &ops::RangeFrom<uint>) -> &str {
-            self.slice_from(index.start)
+            // is_char_boundary checks that the index is in [0, .len()]
+            if self.is_char_boundary(index.start) {
+                unsafe { self.slice_unchecked(index.start, self.len()) }
+            } else {
+                super::slice_error_fail(self, index.start, self.len())
+            }
         }
     }
+
+    #[stable]
     impl ops::Index<ops::FullRange> for str {
         type Output = str;
         #[inline]
@@ -1150,7 +1245,7 @@ mod traits {
 
 /// Any string that can be represented as a slice
 #[unstable = "Instead of taking this bound generically, this trait will be \
-              replaced with one of slicing syntax, deref coercions, or \
+              replaced with one of slicing syntax (&foo[]), deref coercions, or \
               a more generic conversion trait"]
 pub trait Str {
     /// Work with `self` as a slice.
@@ -1211,9 +1306,6 @@ pub trait StrExt {
     fn lines<'a>(&'a self) -> Lines<'a>;
     fn lines_any<'a>(&'a self) -> LinesAny<'a>;
     fn char_len(&self) -> uint;
-    fn slice<'a>(&'a self, begin: uint, end: uint) -> &'a str;
-    fn slice_from<'a>(&'a self, begin: uint) -> &'a str;
-    fn slice_to<'a>(&'a self, end: uint) -> &'a str;
     fn slice_chars<'a>(&'a self, begin: uint, end: uint) -> &'a str;
     unsafe fn slice_unchecked<'a>(&'a self, begin: uint, end: uint) -> &'a str;
     fn starts_with(&self, pat: &str) -> bool;
@@ -1335,7 +1427,7 @@ impl StrExt for str {
     fn lines_any(&self) -> LinesAny {
         fn f(line: &str) -> &str {
             let l = line.len();
-            if l > 0 && line.as_bytes()[l - 1] == b'\r' { line.slice(0, l - 1) }
+            if l > 0 && line.as_bytes()[l - 1] == b'\r' { &line[0 .. l - 1] }
             else { line }
         }
 
@@ -1345,38 +1437,6 @@ impl StrExt for str {
 
     #[inline]
     fn char_len(&self) -> uint { self.chars().count() }
-
-    #[inline]
-    fn slice(&self, begin: uint, end: uint) -> &str {
-        // is_char_boundary checks that the index is in [0, .len()]
-        if begin <= end &&
-           self.is_char_boundary(begin) &&
-           self.is_char_boundary(end) {
-            unsafe { self.slice_unchecked(begin, end) }
-        } else {
-            slice_error_fail(self, begin, end)
-        }
-    }
-
-    #[inline]
-    fn slice_from(&self, begin: uint) -> &str {
-        // is_char_boundary checks that the index is in [0, .len()]
-        if self.is_char_boundary(begin) {
-            unsafe { self.slice_unchecked(begin, self.len()) }
-        } else {
-            slice_error_fail(self, begin, self.len())
-        }
-    }
-
-    #[inline]
-    fn slice_to(&self, end: uint) -> &str {
-        // is_char_boundary checks that the index is in [0, .len()]
-        if self.is_char_boundary(end) {
-            unsafe { self.slice_unchecked(0, end) }
-        } else {
-            slice_error_fail(self, 0, end)
-        }
-    }
 
     fn slice_chars(&self, begin: uint, end: uint) -> &str {
         assert!(begin <= end);
@@ -1412,13 +1472,13 @@ impl StrExt for str {
     #[inline]
     fn starts_with(&self, needle: &str) -> bool {
         let n = needle.len();
-        self.len() >= n && needle.as_bytes() == &self.as_bytes()[0..n]
+        self.len() >= n && needle.as_bytes() == &self.as_bytes()[..n]
     }
 
     #[inline]
     fn ends_with(&self, needle: &str) -> bool {
         let (m, n) = (self.len(), needle.len());
-        m >= n && needle.as_bytes() == &self.as_bytes()[(m-n)..]
+        m >= n && needle.as_bytes() == &self.as_bytes()[m-n..]
     }
 
     #[inline]
@@ -1450,7 +1510,7 @@ impl StrExt for str {
             None => "",
             Some(last) => {
                 let next = self.char_range_at(last).next;
-                unsafe { self.slice_unchecked(0u, next) }
+                unsafe { self.slice_unchecked(0, next) }
             }
         }
     }
@@ -1466,25 +1526,8 @@ impl StrExt for str {
 
     #[inline]
     fn char_range_at(&self, i: uint) -> CharRange {
-        if self.as_bytes()[i] < 128u8 {
-            return CharRange {ch: self.as_bytes()[i] as char, next: i + 1 };
-        }
-
-        // Multibyte case is a fn to allow char_range_at to inline cleanly
-        fn multibyte_char_range_at(s: &str, i: uint) -> CharRange {
-            let mut val = s.as_bytes()[i] as u32;
-            let w = UTF8_CHAR_WIDTH[val as uint] as uint;
-            assert!((w != 0));
-
-            val = utf8_first_byte!(val, w);
-            val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 1]);
-            if w > 2 { val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 2]); }
-            if w > 3 { val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 3]); }
-
-            return CharRange {ch: unsafe { mem::transmute(val) }, next: i + w};
-        }
-
-        return multibyte_char_range_at(self, i);
+        let (c, n) = char_range_at_raw(self.as_bytes(), i);
+        CharRange { ch: unsafe { mem::transmute(c) }, next: n }
     }
 
     #[inline]
@@ -1500,7 +1543,7 @@ impl StrExt for str {
         fn multibyte_char_range_at_reverse(s: &str, mut i: uint) -> CharRange {
             // while there is a previous byte == 10......
             while i > 0 && s.as_bytes()[i] & !CONT_MASK == TAG_CONT_U8 {
-                i -= 1u;
+                i -= 1;
             }
 
             let mut val = s.as_bytes()[i] as u32;
@@ -1570,7 +1613,7 @@ impl StrExt for str {
         if self.is_empty() {
             None
         } else {
-            let CharRange {ch, next} = self.char_range_at(0u);
+            let CharRange {ch, next} = self.char_range_at(0);
             let next_s = unsafe { self.slice_unchecked(next, self.len()) };
             Some((ch, next_s))
         }
@@ -1602,6 +1645,32 @@ impl StrExt for str {
     fn parse<T: FromStr>(&self) -> Option<T> { FromStr::from_str(self) }
 }
 
+/// Pluck a code point out of a UTF-8-like byte slice and return the
+/// index of the next code point.
+#[inline]
+#[unstable]
+pub fn char_range_at_raw(bytes: &[u8], i: uint) -> (u32, usize) {
+    if bytes[i] < 128u8 {
+        return (bytes[i] as u32, i + 1);
+    }
+
+    // Multibyte case is a fn to allow char_range_at to inline cleanly
+    fn multibyte_char_range_at(bytes: &[u8], i: uint) -> (u32, usize) {
+        let mut val = bytes[i] as u32;
+        let w = UTF8_CHAR_WIDTH[val as uint] as uint;
+        assert!((w != 0));
+
+        val = utf8_first_byte!(val, w);
+        val = utf8_acc_cont_byte!(val, bytes[i + 1]);
+        if w > 2 { val = utf8_acc_cont_byte!(val, bytes[i + 2]); }
+        if w > 3 { val = utf8_acc_cont_byte!(val, bytes[i + 3]); }
+
+        return (val, i + w);
+    }
+
+    multibyte_char_range_at(bytes, i)
+}
+
 #[stable]
 impl<'a> Default for &'a str {
     #[stable]
@@ -1616,13 +1685,15 @@ impl<'a> Iterator for Lines<'a> {
     fn next(&mut self) -> Option<&'a str> { self.inner.next() }
     #[inline]
     fn size_hint(&self) -> (uint, Option<uint>) { self.inner.size_hint() }
+}
 
-#[stable]}
+#[stable]
 impl<'a> DoubleEndedIterator for Lines<'a> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a str> { self.inner.next_back() }
+}
 
-#[stable]}
+#[stable]
 impl<'a> Iterator for LinesAny<'a> {
     type Item = &'a str;
 
@@ -1630,8 +1701,9 @@ impl<'a> Iterator for LinesAny<'a> {
     fn next(&mut self) -> Option<&'a str> { self.inner.next() }
     #[inline]
     fn size_hint(&self) -> (uint, Option<uint>) { self.inner.size_hint() }
+}
 
-#[stable]}
+#[stable]
 impl<'a> DoubleEndedIterator for LinesAny<'a> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a str> { self.inner.next_back() }

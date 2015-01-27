@@ -17,6 +17,7 @@
 use clone::Clone;
 use cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
 use fmt;
+use hash::{Hash, Hasher, self};
 use marker::Copy;
 use ops::{Deref, FullRange};
 use option::Option;
@@ -32,10 +33,16 @@ macro_rules! array_impls {
                 }
             }
 
-            #[unstable = "waiting for Show to stabilize"]
-            impl<T:fmt::Show> fmt::Show for [T; $N] {
+            impl<S: hash::Writer + Hasher, T: Hash<S>> Hash<S> for [T; $N] {
+                fn hash(&self, state: &mut S) {
+                    Hash::hash(&self[], state)
+                }
+            }
+
+            #[stable]
+            impl<T: fmt::Debug> fmt::Debug for [T; $N] {
                 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                    fmt::Show::fmt(&&self[], f)
+                    fmt::Debug::fmt(&&self[], f)
                 }
             }
 

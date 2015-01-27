@@ -39,25 +39,29 @@ macro_rules! panic {
 /// // the panic message for these assertions is the stringified value of the
 /// // expression given.
 /// assert!(true);
-/// # fn some_computation() -> bool { true }
+///
+/// fn some_computation() -> bool { true } // a very simple function
+///
 /// assert!(some_computation());
 ///
 /// // assert with a custom message
-/// # let x = true;
+/// let x = true;
 /// assert!(x, "x wasn't true!");
-/// # let a = 3i; let b = 27i;
+///
+/// let a = 3; let b = 27;
 /// assert!(a + b == 30, "a = {}, b = {}", a, b);
 /// ```
 #[macro_export]
+#[stable]
 macro_rules! assert {
     ($cond:expr) => (
         if !$cond {
             panic!(concat!("assertion failed: ", stringify!($cond)))
         }
     );
-    ($cond:expr, $($arg:expr),+) => (
+    ($cond:expr, $($arg:tt)+) => (
         if !$cond {
-            panic!($($arg),+)
+            panic!($($arg)+)
         }
     );
 }
@@ -70,11 +74,12 @@ macro_rules! assert {
 /// # Example
 ///
 /// ```
-/// let a = 3i;
-/// let b = 1i + 2i;
+/// let a = 3;
+/// let b = 1 + 2;
 /// assert_eq!(a, b);
 /// ```
 #[macro_export]
+#[stable]
 macro_rules! assert_eq {
     ($left:expr , $right:expr) => ({
         match (&($left), &($right)) {
@@ -106,16 +111,19 @@ macro_rules! assert_eq {
 /// // the panic message for these assertions is the stringified value of the
 /// // expression given.
 /// debug_assert!(true);
-/// # fn some_expensive_computation() -> bool { true }
+///
+/// fn some_expensive_computation() -> bool { true } // a very simple function
 /// debug_assert!(some_expensive_computation());
 ///
 /// // assert with a custom message
-/// # let x = true;
+/// let x = true;
 /// debug_assert!(x, "x wasn't true!");
-/// # let a = 3i; let b = 27i;
+///
+/// let a = 3; let b = 27;
 /// debug_assert!(a + b == 30, "a = {}, b = {}", a, b);
 /// ```
 #[macro_export]
+#[stable]
 macro_rules! debug_assert {
     ($($arg:tt)*) => (if cfg!(not(ndebug)) { assert!($($arg)*); })
 }
@@ -133,8 +141,8 @@ macro_rules! debug_assert {
 /// # Example
 ///
 /// ```
-/// let a = 3i;
-/// let b = 1i + 2i;
+/// let a = 3;
+/// let b = 1 + 2;
 /// debug_assert_eq!(a, b);
 /// ```
 #[macro_export]
@@ -227,6 +235,7 @@ macro_rules! writeln {
 /// }
 /// ```
 #[macro_export]
+#[unstable = "relationship with panic is unclear"]
 macro_rules! unreachable {
     () => ({
         panic!("internal error: entered unreachable code")
@@ -242,6 +251,7 @@ macro_rules! unreachable {
 /// A standardised placeholder for marking unfinished code. It panics with the
 /// message `"not yet implemented"` when executed.
 #[macro_export]
+#[unstable = "relationship with panic is unclear"]
 macro_rules! unimplemented {
     () => (panic!("not yet implemented"))
 }
