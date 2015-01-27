@@ -2,7 +2,6 @@ pub use self::Colors::*;
 
 use utils::{transmute, IntRange};
 
-#[deriving(Copy)]
 pub enum Colors {
     Black      = 0,
     Blue       = 1,
@@ -22,7 +21,6 @@ pub enum Colors {
     White      = 15,
 }
 
-#[deriving(Copy)]
 pub struct Cell {
     pub x: isize,
     pub y: isize,
@@ -48,6 +46,7 @@ impl Cell {
     }
 
     #[no_stack_check]
+    #[no_mangle]
     pub fn put_char(&self, ch: char) {
         let chr = ch as u16;
         let fg = self.fg << 8;
@@ -59,6 +58,7 @@ impl Cell {
     }
 
     #[no_stack_check]
+    #[no_mangle]
     pub fn puts(&mut self, s: &str) {
         let ss: &[u8] = unsafe {transmute(s)};
         let mut st = ss;
@@ -82,6 +82,7 @@ impl Cell {
 }
 
 #[no_stack_check]
+#[no_mangle]
 pub fn clear_screen(background: Colors) {
     let color = background as u16;
     for i in range!(80*25is) {

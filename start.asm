@@ -1,13 +1,18 @@
 [BITS 32]
 %include "gdt.asm"
 %include "isr.asm"
-global start
-global idtr
 extern main
 extern _load_idt
+
+global start
 start:
     mov esp, _sys_stack
     jmp stub
+
+global idtr
+idtr:
+    dw 0
+    dd 0
 
 ALIGN 4
 mboot:
@@ -29,11 +34,9 @@ mboot:
     dd end
     dd start
 stub:
-    cli
     call load_gdt
     call _load_idt
     lidt [idtr]
-    ret
     sti
     call main
     jmp $
@@ -42,7 +45,3 @@ stub:
 SECTION .bss
     resb 8192
 _sys_stack:
-
-idtr:
-    dw 0
-    dd 0

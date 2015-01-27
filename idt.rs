@@ -52,7 +52,7 @@ static mut idt: [IDT; 256] = [IDT {base1: 0, selector: 0, zero: 0, attrs: 0, bas
 static mut isrs: [unsafe extern "C" fn(); 32] = [_isr0, _isr1, _isr2, _isr3, _isr4, _isr5, _isr6, _isr7, _isr8, _isr9, _isr10, _isr11, _isr12, _isr13, _isr14, _isr15, _isr16, _isr17, _isr18, _isr19, _isr20, _isr21, _isr22, _isr23, _isr24, _isr25, _isr26, _isr27, _isr28, _isr29, _isr30, _isr31];
 static mut irqs: [unsafe extern "C" fn(); 16] = [_irq0, _irq1, _irq2, _irq3, _irq4, _irq5, _irq6, _irq7, _irq8, _irq9, _irq10, _irq11, _irq12, _irq13, _irq14, _irq15];
 static mut _irq_routines: [Option<unsafe extern "C" fn(Regs)>; 16] = [None; 16];
-static messages: [&'static str; 21] = [
+static MESSAGES: [&'static str; 21] = [
     "divide by zero\n",
     "debug\n",
     "non maskable isizeerrupt\n",
@@ -96,16 +96,17 @@ pub unsafe extern "C" fn _load_idt() {
     utils::outb(0x21, 0x0);
     utils::outb(0xA1, 0x0);
 
+    utils::outb(0x21,0xFD);
+    utils::outb(0xA1,0xFF);    
+
     idtr.limit = (size_of::<IDT>() * 256 - 1) as u16;
     idtr.base = &mut idt as *mut[IDT; 256] as u32;
-    //asm!("lidt ($0)" :: "r" (idtr));
-    //asm!("sti");
 }
 
 #[no_stack_check]
 #[no_mangle]
 pub extern "C" fn _fault_handler(stack: Regs){
-    let idx = match (stack.int_no >= 19) {
+    let idx = match stack.int_no >= 19 {
         false  => stack.int_no,
         true => 19,
     };
@@ -117,7 +118,7 @@ pub extern "C" fn _fault_handler(stack: Regs){
             bg : io::Black as u16,
             fg : io::White as u16, 
         };
-        unsafe{x.puts(*messages.get_unchecked(idx));}
+        unsafe{x.puts(*MESSAGES.get_unchecked(idx));}
         x.puts("Exception, halting...");
         loop {}
     }

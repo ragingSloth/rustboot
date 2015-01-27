@@ -1,3 +1,6 @@
+extern _fault_handler
+extern _irq_handler
+
 %macro ISR_RET 1
     global _isr%1
     _isr%1:
@@ -61,7 +64,6 @@ isr_stub:
     mov eax, esp
     push eax
     
-    extern _fault_handler
     mov eax, _fault_handler
     call eax
 
@@ -118,7 +120,6 @@ irq_stub:
     mov eax, esp
     push eax
 
-    extern _irq_handler
     mov eax, _irq_handler
     call eax
 
