@@ -20,7 +20,6 @@ struct GDTR {
 
 #[no_mangle]
 static mut gdt: [GDT; 3] = [GDT {limit1: 0, base1: 0, base2: 0, access: 0, granularity: 0, base3: 0}; 3];
-#[no_mangle]
 
 extern "C" {
     fn _gdt_flush();

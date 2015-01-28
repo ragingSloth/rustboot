@@ -67,7 +67,7 @@ static MESSAGES: [&'static str; 21] = [
     "stack fault\n",
     "general protection fault\n",
     "page fault\n",
-    "unknown isizeerrupt\n",
+    "unknown interrup\n",
     "coprocessor fault\n",
     "alignment check (i486+)\n",
     "machine check(pentium/i586+)\n",

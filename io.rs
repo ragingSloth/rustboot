@@ -1,7 +1,9 @@
 pub use self::Colors::*;
 
 use utils::{transmute, IntRange};
+use core::prelude::{SliceExt, StrExt, Str};
 
+#[repr(u16)]
 pub enum Colors {
     Black      = 0,
     Blue       = 1,
@@ -42,40 +44,31 @@ impl Cell {
 
     pub fn new_line(&mut self) {
         self.y += 1;
-        self.x = -1;
+        self.x = 0;
     }
 
     #[no_stack_check]
     #[no_mangle]
-    pub fn put_char(&self, ch: char) {
-        let chr = ch as u16;
+    pub fn put_char(&mut self, chr: char) {
+        if chr == '\n' {
+            self.new_line();
+            return ();
+        }
+        let ch = chr as u16;
         let fg = self.fg << 8;
         let bg = self.bg << 12;
         let fill: isize = self.get_fill();
-        unsafe{
-            *((0xb8000 + fill) as *mut u16) = chr | fg | bg;
+        unsafe {
+            *((0xb8000 + fill) as *mut u16) = ch | fg | bg;
         }
+        self.incr();
     }
 
     #[no_stack_check]
     #[no_mangle]
     pub fn puts(&mut self, s: &str) {
-        let ss: &[u8] = unsafe {transmute(s)};
-        let mut st = ss;
-        loop {
-            st = match st { 
-                [x, xs..] => {
-                    if x == '\n' as u8 {
-                        self.new_line();
-                    }
-                    else {
-                        self.incr();
-                        self.put_char((x as char));
-                    }
-                    xs
-                }
-                [] => break,
-            };
+        for c in s.as_bytes().iter() {
+            self.put_char(*c as char);
         }
     }
 
@@ -85,7 +78,7 @@ impl Cell {
 #[no_mangle]
 pub fn clear_screen(background: Colors) {
     let color = background as u16;
-    for i in range!(80*25is) {
+    for i in range!(2000) {
         unsafe{
             *((0xb8000 + i*2) as *mut u16) = color << 12;
         }
