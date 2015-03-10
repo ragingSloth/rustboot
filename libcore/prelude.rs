@@ -26,7 +26,7 @@
 
 // Reexported core operators
 pub use marker::{Copy, Send, Sized, Sync};
-pub use ops::{Drop, Fn, FnMut, FnOnce, FullRange};
+pub use ops::{Drop, Fn, FnMut, FnOnce};
 
 // Reexported functions
 pub use iter::range;

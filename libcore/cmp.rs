@@ -8,38 +8,36 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Defines the `PartialOrd` and `PartialEq` comparison traits.
+//! Functionality for ordering and comparison.
 //!
-//! This module defines both `PartialOrd` and `PartialEq` traits which are used by the
-//! compiler to implement comparison operators. Rust programs may implement
-//!`PartialOrd` to overload the `<`, `<=`, `>`, and `>=` operators, and may implement
-//! `PartialEq` to overload the `==` and `!=` operators.
+//! This module defines both `PartialOrd` and `PartialEq` traits which are used by the compiler to
+//! implement comparison operators. Rust programs may implement `PartialOrd` to overload the `<`,
+//! `<=`, `>`, and `>=` operators, and may implement `PartialEq` to overload the `==` and `!=`
+//! operators.
 //!
-//! For example, to define a type with a customized definition for the PartialEq
-//! operators, you could do the following:
+//! For example, to define a type with a customized definition for the PartialEq operators, you
+//! could do the following:
 //!
-//! ```rust
+//! ```
 //! use core::num::SignedInt;
 //!
-//! // Our type.
-//! struct SketchyNum {
-//!     num : int
+//! struct FuzzyNum {
+//!     num: i32,
 //! }
 //!
-//! // Our implementation of `PartialEq` to support `==` and `!=`.
-//! impl PartialEq for SketchyNum {
+//! impl PartialEq for FuzzyNum {
 //!     // Our custom eq allows numbers which are near each other to be equal! :D
-//!     fn eq(&self, other: &SketchyNum) -> bool {
+//!     fn eq(&self, other: &FuzzyNum) -> bool {
 //!         (self.num - other.num).abs() < 5
 //!     }
 //! }
 //!
 //! // Now these binary operators will work when applied!
-//! assert!(SketchyNum {num: 37} == SketchyNum {num: 34});
-//! assert!(SketchyNum {num: 25} != SketchyNum {num: 57});
+//! assert!(FuzzyNum { num: 37 } == FuzzyNum { num: 34 });
+//! assert!(FuzzyNum { num: 25 } != FuzzyNum { num: 57 });
 //! ```
 
-#![stable]
+#![stable(feature = "rust1", since = "1.0.0")]
 
 use self::Ordering::*;
 
@@ -49,48 +47,49 @@ use option::Option::{self, Some, None};
 /// Trait for equality comparisons which are [partial equivalence relations](
 /// http://en.wikipedia.org/wiki/Partial_equivalence_relation).
 ///
-/// This trait allows for partial equality, for types that do not have a full
-/// equivalence relation. For example, in floating point numbers `NaN != NaN`,
-/// so floating point types implement `PartialEq` but not `Eq`.
+/// This trait allows for partial equality, for types that do not have a full equivalence relation.
+/// For example, in floating point numbers `NaN != NaN`, so floating point types implement
+/// `PartialEq` but not `Eq`.
 ///
 /// Formally, the equality must be (for all `a`, `b` and `c`):
 ///
 /// - symmetric: `a == b` implies `b == a`; and
 /// - transitive: `a == b` and `b == c` implies `a == c`.
 ///
-/// Note that these requirements mean that the trait itself must be
-/// implemented symmetrically and transitively: if `T: PartialEq<U>`
-/// and `U: PartialEq<V>` then `U: PartialEq<T>` and `T:
+/// Note that these requirements mean that the trait itself must be implemented symmetrically and
+/// transitively: if `T: PartialEq<U>` and `U: PartialEq<V>` then `U: PartialEq<T>` and `T:
 /// PartialEq<V>`.
 ///
-/// PartialEq only requires the `eq` method to be implemented; `ne` is defined
-/// in terms of it by default. Any manual implementation of `ne` *must* respect
-/// the rule that `eq` is a strict inverse of `ne`; that is, `!(a == b)` if and
-/// only if `a != b`.
+/// PartialEq only requires the `eq` method to be implemented; `ne` is defined in terms of it by
+/// default. Any manual implementation of `ne` *must* respect the rule that `eq` is a strict
+/// inverse of `ne`; that is, `!(a == b)` if and only if `a != b`.
 #[lang="eq"]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 #[old_orphan_check]
 pub trait PartialEq<Rhs: ?Sized = Self> {
     /// This method tests for `self` and `other` values to be equal, and is used by `==`.
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn eq(&self, other: &Rhs) -> bool;
 
     /// This method tests for `!=`.
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn ne(&self, other: &Rhs) -> bool { !self.eq(other) }
 }
 
 /// Trait for equality comparisons which are [equivalence relations](
 /// https://en.wikipedia.org/wiki/Equivalence_relation).
 ///
-/// This means, that in addition to `a == b` and `a != b` being strict
-/// inverses, the equality must be (for all `a`, `b` and `c`):
+/// This means, that in addition to `a == b` and `a != b` being strict inverses, the equality must
+/// be (for all `a`, `b` and `c`):
 ///
 /// - reflexive: `a == a`;
 /// - symmetric: `a == b` implies `b == a`; and
 /// - transitive: `a == b` and `b == c` implies `a == c`.
-#[stable]
+///
+/// This property cannot be checked by the compiler, and therefore `Eq` implies
+/// `PartialEq`, and has no extra methods.
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait Eq: PartialEq<Self> {
     // FIXME #13101: this method is used solely by #[deriving] to
     // assert that every component of a type implements #[deriving]
@@ -101,36 +100,63 @@ pub trait Eq: PartialEq<Self> {
     // This should never be implemented by hand.
     #[doc(hidden)]
     #[inline(always)]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn assert_receiver_is_total_eq(&self) {}
 }
 
-/// An ordering is, e.g, a result of a comparison between two values.
-#[derive(Clone, Copy, PartialEq, Show)]
-#[stable]
+/// An `Ordering` is the result of a comparison between two values.
+///
+/// # Examples
+///
+/// ```
+/// use std::cmp::Ordering;
+///
+/// let result = 1.cmp(&2);
+/// assert_eq!(Ordering::Less, result);
+///
+/// let result = 1.cmp(&1);
+/// assert_eq!(Ordering::Equal, result);
+///
+/// let result = 2.cmp(&1);
+/// assert_eq!(Ordering::Greater, result);
+/// ```
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub enum Ordering {
     /// An ordering where a compared value is less [than another].
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     Less = -1,
     /// An ordering where a compared value is equal [to another].
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     Equal = 0,
     /// An ordering where a compared value is greater [than another].
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     Greater = 1,
 }
 
 impl Ordering {
-    /// Reverse the `Ordering`, so that `Less` becomes `Greater` and
-    /// vice versa.
+    /// Reverse the `Ordering`.
     ///
-    /// # Example
+    /// * `Less` becomes `Greater`.
+    /// * `Greater` becomes `Less`.
+    /// * `Equal` becomes `Equal`.
     ///
-    /// ```rust
-    /// use std::cmp::Ordering::{Less, Equal, Greater};
+    /// # Examples
     ///
-    /// assert_eq!(Less.reverse(), Greater);
-    /// assert_eq!(Equal.reverse(), Equal);
-    /// assert_eq!(Greater.reverse(), Less);
+    /// Basic behavior:
+    ///
+    /// ```
+    /// use std::cmp::Ordering;
+    ///
+    /// assert_eq!(Ordering::Less.reverse(), Ordering::Greater);
+    /// assert_eq!(Ordering::Equal.reverse(), Ordering::Equal);
+    /// assert_eq!(Ordering::Greater.reverse(), Ordering::Less);
+    /// ```
+    ///
+    /// This method can be used to reverse a comparison:
+    ///
+    /// ```
+    /// use std::cmp::Ordering;
     ///
     /// let mut data: &mut [_] = &mut [2, 10, 5, 8];
     ///
@@ -141,7 +167,7 @@ impl Ordering {
     /// assert!(data == b);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn reverse(self) -> Ordering {
         unsafe {
             // this compiles really nicely (to a single instruction);
@@ -155,51 +181,50 @@ impl Ordering {
     }
 }
 
-/// Trait for types that form a [total order](
-/// https://en.wikipedia.org/wiki/Total_order).
+/// Trait for types that form a [total order](https://en.wikipedia.org/wiki/Total_order).
 ///
 /// An order is a total order if it is (for all `a`, `b` and `c`):
 ///
-/// - total and antisymmetric: exactly one of `a < b`, `a == b` or `a > b` is
-///   true; and
-/// - transitive, `a < b` and `b < c` implies `a < c`. The same must hold for
-///   both `==` and `>`.
-#[stable]
+/// - total and antisymmetric: exactly one of `a < b`, `a == b` or `a > b` is true; and
+/// - transitive, `a < b` and `b < c` implies `a < c`. The same must hold for both `==` and `>`.
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait Ord: Eq + PartialOrd<Self> {
-    /// This method returns an ordering between `self` and `other` values.
+    /// This method returns an `Ordering` between `self` and `other`.
     ///
-    /// By convention, `self.cmp(&other)` returns the ordering matching
-    /// the expression `self <operator> other` if true.  For example:
+    /// By convention, `self.cmp(&other)` returns the ordering matching the expression
+    /// `self <operator> other` if true.
+    ///
+    /// # Examples
     ///
     /// ```
-    /// use std::cmp::Ordering::{Less, Equal, Greater};
+    /// use std::cmp::Ordering;
     ///
-    /// assert_eq!( 5.cmp(&10), Less);     // because 5 < 10
-    /// assert_eq!(10.cmp(&5),  Greater);  // because 10 > 5
-    /// assert_eq!( 5.cmp(&5),  Equal);    // because 5 == 5
+    /// assert_eq!(5.cmp(&10), Ordering::Less);
+    /// assert_eq!(10.cmp(&5), Ordering::Greater);
+    /// assert_eq!(5.cmp(&5), Ordering::Equal);
     /// ```
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn cmp(&self, other: &Self) -> Ordering;
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl Eq for Ordering {}
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl Ord for Ordering {
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn cmp(&self, other: &Ordering) -> Ordering {
-        (*self as int).cmp(&(*other as int))
+        (*self as i32).cmp(&(*other as i32))
     }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl PartialOrd for Ordering {
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn partial_cmp(&self, other: &Ordering) -> Option<Ordering> {
-        (*self as int).partial_cmp(&(*other as int))
+        (*self as i32).partial_cmp(&(*other as i32))
     }
 }
 
@@ -208,32 +233,62 @@ impl PartialOrd for Ordering {
 /// The comparison must satisfy, for all `a`, `b` and `c`:
 ///
 /// - antisymmetry: if `a < b` then `!(a > b)` and vice versa; and
-/// - transitivity: `a < b` and `b < c` implies `a < c`. The same must hold for
-///   both `==` and `>`.
+/// - transitivity: `a < b` and `b < c` implies `a < c`. The same must hold for both `==` and `>`.
 ///
-/// Note that these requirements mean that the trait itself must be
-/// implemented symmetrically and transitively: if `T: PartialOrd<U>`
-/// and `U: PartialOrd<V>` then `U: PartialOrd<T>` and `T:
+/// Note that these requirements mean that the trait itself must be implemented symmetrically and
+/// transitively: if `T: PartialOrd<U>` and `U: PartialOrd<V>` then `U: PartialOrd<T>` and `T:
 /// PartialOrd<V>`.
 ///
-/// PartialOrd only requires implementation of the `partial_cmp` method,
-/// with the others generated from default implementations.
+/// PartialOrd only requires implementation of the `partial_cmp` method, with the others generated
+/// from default implementations.
 ///
-/// However it remains possible to implement the others separately for types
-/// which do not have a total order. For example, for floating point numbers,
-/// `NaN < 0 == false` and `NaN >= 0 == false` (cf. IEEE 754-2008 section
-/// 5.11).
+/// However it remains possible to implement the others separately for types which do not have a
+/// total order. For example, for floating point numbers, `NaN < 0 == false` and `NaN >= 0 ==
+/// false` (cf. IEEE 754-2008 section 5.11).
 #[lang="ord"]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
-    /// This method returns an ordering between `self` and `other` values
-    /// if one exists.
-    #[stable]
+    /// This method returns an ordering between `self` and `other` values if one exists.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::cmp::Ordering;
+    ///
+    /// let result = 1.0.partial_cmp(&2.0);
+    /// assert_eq!(result, Some(Ordering::Less));
+    ///
+    /// let result = 1.0.partial_cmp(&1.0);
+    /// assert_eq!(result, Some(Ordering::Equal));
+    ///
+    /// let result = 2.0.partial_cmp(&1.0);
+    /// assert_eq!(result, Some(Ordering::Greater));
+    /// ```
+    ///
+    /// When comparison is impossible:
+    ///
+    /// ```
+    /// let result = std::f64::NAN.partial_cmp(&1.0);
+    /// assert_eq!(result, None);
+    /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn partial_cmp(&self, other: &Rhs) -> Option<Ordering>;
 
     /// This method tests less than (for `self` and `other`) and is used by the `<` operator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::cmp::Ordering;
+    ///
+    /// let result = 1.0 < 2.0;
+    /// assert_eq!(result, true);
+    ///
+    /// let result = 2.0 < 1.0;
+    /// assert_eq!(result, false);
+    /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn lt(&self, other: &Rhs) -> bool {
         match self.partial_cmp(other) {
             Some(Less) => true,
@@ -241,9 +296,20 @@ pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
         }
     }
 
-    /// This method tests less than or equal to (`<=`).
+    /// This method tests less than or equal to (for `self` and `other`) and is used by the `<=`
+    /// operator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let result = 1.0 <= 2.0;
+    /// assert_eq!(result, true);
+    ///
+    /// let result = 2.0 <= 2.0;
+    /// assert_eq!(result, true);
+    /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn le(&self, other: &Rhs) -> bool {
         match self.partial_cmp(other) {
             Some(Less) | Some(Equal) => true,
@@ -251,9 +317,19 @@ pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
         }
     }
 
-    /// This method tests greater than (`>`).
+    /// This method tests greater than (for `self` and `other`) and is used by the `>` operator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let result = 1.0 > 2.0;
+    /// assert_eq!(result, false);
+    ///
+    /// let result = 2.0 > 2.0;
+    /// assert_eq!(result, false);
+    /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn gt(&self, other: &Rhs) -> bool {
         match self.partial_cmp(other) {
             Some(Greater) => true,
@@ -261,9 +337,20 @@ pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
         }
     }
 
-    /// This method tests greater than or equal to (`>=`).
+    /// This method tests greater than or equal to (for `self` and `other`) and is used by the `>=`
+    /// operator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let result = 2.0 >= 1.0;
+    /// assert_eq!(result, true);
+    ///
+    /// let result = 2.0 >= 2.0;
+    /// assert_eq!(result, true);
+    /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn ge(&self, other: &Rhs) -> bool {
         match self.partial_cmp(other) {
             Some(Greater) | Some(Equal) => true,
@@ -273,15 +360,33 @@ pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
 }
 
 /// Compare and return the minimum of two values.
+///
+/// # Examples
+///
+/// ```
+/// use std::cmp;
+///
+/// assert_eq!(1, cmp::min(1, 2));
+/// assert_eq!(2, cmp::min(2, 2));
+/// ```
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub fn min<T: Ord>(v1: T, v2: T) -> T {
     if v1 < v2 { v1 } else { v2 }
 }
 
 /// Compare and return the maximum of two values.
+///
+/// # Examples
+///
+/// ```
+/// use std::cmp;
+///
+/// assert_eq!(2, cmp::max(1, 2));
+/// assert_eq!(2, cmp::max(2, 2));
+/// ```
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub fn max<T: Ord>(v1: T, v2: T) -> T {
     if v1 > v2 { v1 } else { v2 }
 }
@@ -289,8 +394,26 @@ pub fn max<T: Ord>(v1: T, v2: T) -> T {
 /// Compare and return the minimum of two values if there is one.
 ///
 /// Returns the first argument if the comparison determines them to be equal.
+///
+/// # Examples
+///
+/// ```
+/// use std::cmp;
+///
+/// assert_eq!(Some(1), cmp::partial_min(1, 2));
+/// assert_eq!(Some(2), cmp::partial_min(2, 2));
+/// ```
+///
+/// When comparison is impossible:
+///
+/// ```
+/// use std::cmp;
+///
+/// let result = cmp::partial_min(std::f64::NAN, 1.0);
+/// assert_eq!(result, None);
+/// ```
 #[inline]
-#[unstable]
+#[unstable(feature = "core")]
 pub fn partial_min<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
     match v1.partial_cmp(&v2) {
         Some(Less) | Some(Equal) => Some(v1),
@@ -302,8 +425,26 @@ pub fn partial_min<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
 /// Compare and return the maximum of two values if there is one.
 ///
 /// Returns the first argument if the comparison determines them to be equal.
+///
+/// # Examples
+///
+/// ```
+/// use std::cmp;
+///
+/// assert_eq!(Some(2), cmp::partial_max(1, 2));
+/// assert_eq!(Some(2), cmp::partial_max(2, 2));
+/// ```
+///
+/// When comparison is impossible:
+///
+/// ```
+/// use std::cmp;
+///
+/// let result = cmp::partial_max(std::f64::NAN, 1.0);
+/// assert_eq!(result, None);
+/// ```
 #[inline]
-#[unstable]
+#[unstable(feature = "core")]
 pub fn partial_max<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
     match v1.partial_cmp(&v2) {
         Some(Less) => Some(v2),
@@ -322,7 +463,7 @@ mod impls {
 
     macro_rules! partial_eq_impl {
         ($($t:ty)*) => ($(
-            #[stable]
+            #[stable(feature = "rust1", since = "1.0.0")]
             impl PartialEq for $t {
                 #[inline]
                 fn eq(&self, other: &$t) -> bool { (*self) == (*other) }
@@ -332,7 +473,7 @@ mod impls {
         )*)
     }
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl PartialEq for () {
         #[inline]
         fn eq(&self, _other: &()) -> bool { true }
@@ -341,21 +482,21 @@ mod impls {
     }
 
     partial_eq_impl! {
-        bool char uint u8 u16 u32 u64 int i8 i16 i32 i64 f32 f64
+        bool char usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64
     }
 
     macro_rules! eq_impl {
         ($($t:ty)*) => ($(
-            #[stable]
+            #[stable(feature = "rust1", since = "1.0.0")]
             impl Eq for $t {}
         )*)
     }
 
-    eq_impl! { () bool char uint u8 u16 u32 u64 int i8 i16 i32 i64 }
+    eq_impl! { () bool char usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
 
     macro_rules! partial_ord_impl {
         ($($t:ty)*) => ($(
-            #[stable]
+            #[stable(feature = "rust1", since = "1.0.0")]
             impl PartialOrd for $t {
                 #[inline]
                 fn partial_cmp(&self, other: &$t) -> Option<Ordering> {
@@ -378,7 +519,7 @@ mod impls {
         )*)
     }
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl PartialOrd for () {
         #[inline]
         fn partial_cmp(&self, _: &()) -> Option<Ordering> {
@@ -386,7 +527,7 @@ mod impls {
         }
     }
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl PartialOrd for bool {
         #[inline]
         fn partial_cmp(&self, other: &bool) -> Option<Ordering> {
@@ -394,11 +535,11 @@ mod impls {
         }
     }
 
-    partial_ord_impl! { char uint u8 u16 u32 u64 int i8 i16 i32 i64 f32 f64 }
+    partial_ord_impl! { char usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
 
     macro_rules! ord_impl {
         ($($t:ty)*) => ($(
-            #[stable]
+            #[stable(feature = "rust1", since = "1.0.0")]
             impl Ord for $t {
                 #[inline]
                 fn cmp(&self, other: &$t) -> Ordering {
@@ -410,13 +551,13 @@ mod impls {
         )*)
     }
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl Ord for () {
         #[inline]
         fn cmp(&self, _other: &()) -> Ordering { Equal }
     }
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl Ord for bool {
         #[inline]
         fn cmp(&self, other: &bool) -> Ordering {
@@ -424,18 +565,18 @@ mod impls {
         }
     }
 
-    ord_impl! { char uint u8 u16 u32 u64 int i8 i16 i32 i64 }
+    ord_impl! { char usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
 
     // & pointers
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, 'b, A: ?Sized, B: ?Sized> PartialEq<&'b B> for &'a A where A: PartialEq<B> {
         #[inline]
         fn eq(&self, other: & &'b B) -> bool { PartialEq::eq(*self, *other) }
         #[inline]
         fn ne(&self, other: & &'b B) -> bool { PartialEq::ne(*self, *other) }
     }
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, 'b, A: ?Sized, B: ?Sized> PartialOrd<&'b B> for &'a A where A: PartialOrd<B> {
         #[inline]
         fn partial_cmp(&self, other: &&'b B) -> Option<Ordering> {
@@ -450,24 +591,24 @@ mod impls {
         #[inline]
         fn gt(&self, other: & &'b B) -> bool { PartialOrd::gt(*self, *other) }
     }
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, A: ?Sized> Ord for &'a A where A: Ord {
         #[inline]
         fn cmp(&self, other: & &'a A) -> Ordering { Ord::cmp(*self, *other) }
     }
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, A: ?Sized> Eq for &'a A where A: Eq {}
 
     // &mut pointers
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, 'b, A: ?Sized, B: ?Sized> PartialEq<&'b mut B> for &'a mut A where A: PartialEq<B> {
         #[inline]
         fn eq(&self, other: &&'b mut B) -> bool { PartialEq::eq(*self, *other) }
         #[inline]
         fn ne(&self, other: &&'b mut B) -> bool { PartialEq::ne(*self, *other) }
     }
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, 'b, A: ?Sized, B: ?Sized> PartialOrd<&'b mut B> for &'a mut A where A: PartialOrd<B> {
         #[inline]
         fn partial_cmp(&self, other: &&'b mut B) -> Option<Ordering> {
@@ -482,15 +623,15 @@ mod impls {
         #[inline]
         fn gt(&self, other: &&'b mut B) -> bool { PartialOrd::gt(*self, *other) }
     }
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, A: ?Sized> Ord for &'a mut A where A: Ord {
         #[inline]
         fn cmp(&self, other: &&'a mut A) -> Ordering { Ord::cmp(*self, *other) }
     }
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, A: ?Sized> Eq for &'a mut A where A: Eq {}
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, 'b, A: ?Sized, B: ?Sized> PartialEq<&'b mut B> for &'a A where A: PartialEq<B> {
         #[inline]
         fn eq(&self, other: &&'b mut B) -> bool { PartialEq::eq(*self, *other) }
@@ -498,7 +639,7 @@ mod impls {
         fn ne(&self, other: &&'b mut B) -> bool { PartialEq::ne(*self, *other) }
     }
 
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a, 'b, A: ?Sized, B: ?Sized> PartialEq<&'b B> for &'a mut A where A: PartialEq<B> {
         #[inline]
         fn eq(&self, other: &&'b B) -> bool { PartialEq::eq(*self, *other) }

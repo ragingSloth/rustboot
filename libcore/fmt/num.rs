@@ -38,7 +38,7 @@ trait GenericRadix {
         // characters for a base 2 number.
         let zero = Int::zero();
         let is_positive = x >= zero;
-        let mut buf = [0u8; 64];
+        let mut buf = [0; 64];
         let mut curr = buf.len();
         let base = cast(self.base()).unwrap();
         if is_positive {
@@ -84,7 +84,7 @@ struct LowerHex;
 
 /// A hexadecimal (base 16) radix, formatted with upper-case characters
 #[derive(Clone, PartialEq)]
-pub struct UpperHex;
+struct UpperHex;
 
 macro_rules! radix {
     ($T:ident, $base:expr, $prefix:expr, $($x:pat => $conv:expr),+) => {
@@ -111,7 +111,8 @@ radix! { UpperHex, 16, "0x", x @  0 ...  9 => b'0' + x,
 
 /// A radix with in the range of `2..36`.
 #[derive(Clone, Copy, PartialEq)]
-#[unstable = "may be renamed or move to a different module"]
+#[unstable(feature = "core",
+           reason = "may be renamed or move to a different module")]
 pub struct Radix {
     base: u8,
 }
@@ -135,7 +136,8 @@ impl GenericRadix for Radix {
 }
 
 /// A helper type for formatting radixes.
-#[unstable = "may be renamed or move to a different module"]
+#[unstable(feature = "core",
+           reason = "may be renamed or move to a different module")]
 #[derive(Copy)]
 pub struct RadixFmt<T, R>(T, R);
 
@@ -147,20 +149,21 @@ pub struct RadixFmt<T, R>(T, R);
 /// use std::fmt::radix;
 /// assert_eq!(format!("{}", radix(55, 36)), "1j".to_string());
 /// ```
-#[unstable = "may be renamed or move to a different module"]
+#[unstable(feature = "core",
+           reason = "may be renamed or move to a different module")]
 pub fn radix<T>(x: T, base: u8) -> RadixFmt<T, Radix> {
     RadixFmt(x, Radix::new(base))
 }
 
 macro_rules! radix_fmt {
-    ($T:ty as $U:ty, $fmt:ident, $S:expr) => {
-        #[stable]
+    ($T:ty as $U:ty, $fmt:ident) => {
+        #[stable(feature = "rust1", since = "1.0.0")]
         impl fmt::Debug for RadixFmt<$T, Radix> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 fmt::Display::fmt(self, f)
             }
         }
-        #[stable]
+        #[stable(feature = "rust1", since = "1.0.0")]
         impl fmt::Display for RadixFmt<$T, Radix> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match *self { RadixFmt(ref x, radix) => radix.$fmt(*x as $U, f) }
@@ -170,7 +173,7 @@ macro_rules! radix_fmt {
 }
 macro_rules! int_base {
     ($Trait:ident for $T:ident as $U:ident -> $Radix:ident) => {
-        #[stable]
+        #[stable(feature = "rust1", since = "1.0.0")]
         impl fmt::$Trait for $T {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 $Radix.fmt_int(*self as $U, f)
@@ -179,9 +182,9 @@ macro_rules! int_base {
     }
 }
 
-macro_rules! show {
-    ($T:ident with $S:expr) => {
-        #[stable]
+macro_rules! debug {
+    ($T:ident) => {
+        #[stable(feature = "rust1", since = "1.0.0")]
         impl fmt::Debug for $T {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 fmt::Display::fmt(self, f)
@@ -191,27 +194,24 @@ macro_rules! show {
 }
 macro_rules! integer {
     ($Int:ident, $Uint:ident) => {
-        integer! { $Int, $Uint, stringify!($Int), stringify!($Uint) }
-    };
-    ($Int:ident, $Uint:ident, $SI:expr, $SU:expr) => {
         int_base! { Display  for $Int as $Int   -> Decimal }
         int_base! { Binary   for $Int as $Uint  -> Binary }
         int_base! { Octal    for $Int as $Uint  -> Octal }
         int_base! { LowerHex for $Int as $Uint  -> LowerHex }
         int_base! { UpperHex for $Int as $Uint  -> UpperHex }
-        radix_fmt! { $Int as $Int, fmt_int, $SI }
-        show! { $Int with $SI }
+        radix_fmt! { $Int as $Int, fmt_int }
+        debug! { $Int }
 
         int_base! { Display  for $Uint as $Uint -> Decimal }
         int_base! { Binary   for $Uint as $Uint -> Binary }
         int_base! { Octal    for $Uint as $Uint -> Octal }
         int_base! { LowerHex for $Uint as $Uint -> LowerHex }
         int_base! { UpperHex for $Uint as $Uint -> UpperHex }
-        radix_fmt! { $Uint as $Uint, fmt_int, $SU }
-        show! { $Uint with $SU }
+        radix_fmt! { $Uint as $Uint, fmt_int }
+        debug! { $Uint }
     }
 }
-integer! { int, uint, "i", "u" }
+integer! { isize, usize }
 integer! { i8, u8 }
 integer! { i16, u16 }
 integer! { i32, u32 }

@@ -23,17 +23,19 @@
 //!
 //! use std::finally::Finally;
 //!
-//! (|&mut:| {
+//! (|| {
 //!     // ...
 //! }).finally(|| {
 //!     // this code is always run
 //! })
 //! ```
 
-#![deprecated = "It is unclear if this module is more robust than implementing \
-                 Drop on a custom type, and this module is being removed with no \
-                 replacement. Use a custom Drop implementation to regain existing \
-                 functionality."]
+#![unstable(feature = "core")]
+#![deprecated(since = "1.0.0",
+              reason = "It is unclear if this module is more robust than implementing \
+                        Drop on a custom type, and this module is being removed with no \
+                        replacement. Use a custom Drop implementation to regain existing \
+                        functionality.")]
 #![allow(deprecated)]
 
 use ops::{Drop, FnMut, FnOnce};
@@ -70,7 +72,7 @@ impl<T, F> Finally<T> for F where F: FnMut() -> T {
 /// ```
 /// use std::finally::try_finally;
 ///
-/// struct State<'a> { buffer: &'a mut [u8], len: uint }
+/// struct State<'a> { buffer: &'a mut [u8], len: usize }
 /// # let mut buf = [];
 /// let mut state = State { buffer: &mut buf, len: 0 };
 /// try_finally(

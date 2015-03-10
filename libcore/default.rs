@@ -16,7 +16,7 @@
 //!
 //! ```
 //! struct SomeOptions {
-//!     foo: int,
+//!     foo: i32,
 //!     bar: f32,
 //! }
 //! ```
@@ -28,7 +28,7 @@
 //!
 //! #[derive(Default)]
 //! struct SomeOptions {
-//!     foo: int,
+//!     foo: i32,
 //!     bar: f32,
 //! }
 //!
@@ -56,7 +56,7 @@
 //!
 //! #[derive(Default)]
 //! struct SomeOptions {
-//!     foo: int,
+//!     foo: i32,
 //!     bar: f32,
 //!     baz: Kind,
 //! }
@@ -73,7 +73,7 @@
 //! # use std::default::Default;
 //! # #[derive(Default)]
 //! # struct SomeOptions {
-//! #     foo: int,
+//! #     foo: i32,
 //! #     bar: f32,
 //! # }
 //! fn main() {
@@ -81,7 +81,7 @@
 //! }
 //! ```
 
-#![stable]
+#![stable(feature = "rust1", since = "1.0.0")]
 
 /// A trait that types which have a useful default value should implement.
 ///
@@ -93,11 +93,11 @@
 /// ```
 /// #[derive(Default)]
 /// struct SomeOptions {
-///     foo: int,
+///     foo: i32,
 ///     bar: f32,
 /// }
 /// ```
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait Default {
     /// Returns the "default value" for a type.
     ///
@@ -113,7 +113,7 @@ pub trait Default {
     ///
     /// let i: i8 = Default::default();
     /// let (x, y): (Option<String>, f64) = Default::default();
-    /// let (a, b, (c, d)): (int, uint, (bool, bool)) = Default::default();
+    /// let (a, b, (c, d)): (i32, u32, (bool, bool)) = Default::default();
     /// ```
     ///
     /// Making your own:
@@ -131,16 +131,16 @@ pub trait Default {
     ///     fn default() -> Kind { Kind::A }
     /// }
     /// ```
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn default() -> Self;
 }
 
 macro_rules! default_impl {
     ($t:ty, $v:expr) => {
-        #[stable]
+        #[stable(feature = "rust1", since = "1.0.0")]
         impl Default for $t {
             #[inline]
-            #[stable]
+            #[stable(feature = "rust1", since = "1.0.0")]
             fn default() -> $t { $v }
         }
     }
@@ -150,13 +150,13 @@ default_impl! { (), () }
 default_impl! { bool, false }
 default_impl! { char, '\x00' }
 
-default_impl! { uint, 0 }
+default_impl! { usize, 0 }
 default_impl! { u8, 0 }
 default_impl! { u16, 0 }
 default_impl! { u32, 0 }
 default_impl! { u64, 0 }
 
-default_impl! { int, 0 }
+default_impl! { isize, 0 }
 default_impl! { i8, 0 }
 default_impl! { i16, 0 }
 default_impl! { i32, 0 }

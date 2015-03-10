@@ -15,15 +15,15 @@
 //! types.
 //!
 //! This module defines atomic versions of a select number of primitive
-//! types, including `AtomicBool`, `AtomicIsize`, `AtomicUsize`, and `AtomicOption`.
+//! types, including `AtomicBool`, `AtomicIsize`, and `AtomicUsize`.
 //! Atomic types present operations that, when used correctly, synchronize
 //! updates between threads.
 //!
 //! Each method takes an `Ordering` which represents the strength of
 //! the memory barrier for that operation. These orderings are the
-//! same as [C++11 atomic orderings][1].
+//! same as [LLVM atomic orderings][1].
 //!
-//! [1]: http://gcc.gnu.org/wiki/Atomic/GCCMM/AtomicSync
+//! [1]: http://llvm.org/docs/LangRef.html#memory-model-for-concurrent-operations
 //!
 //! Atomic variables are safe to share between threads (they implement `Sync`)
 //! but they do not themselves provide the mechanism for sharing. The most
@@ -42,13 +42,13 @@
 //! ```
 //! use std::sync::Arc;
 //! use std::sync::atomic::{AtomicUsize, Ordering};
-//! use std::thread::Thread;
+//! use std::thread;
 //!
 //! fn main() {
 //!     let spinlock = Arc::new(AtomicUsize::new(1));
 //!
 //!     let spinlock_clone = spinlock.clone();
-//!     Thread::spawn(move|| {
+//!     thread::spawn(move|| {
 //!         spinlock_clone.store(0, Ordering::SeqCst);
 //!     });
 //!
@@ -68,7 +68,7 @@
 //! println!("live tasks: {}", old_task_count + 1);
 //! ```
 
-#![stable]
+#![stable(feature = "rust1", since = "1.0.0")]
 
 use self::Ordering::*;
 
@@ -76,9 +76,10 @@ use marker::Sync;
 
 use intrinsics;
 use cell::UnsafeCell;
+use marker::PhantomData;
 
 /// A boolean type which can be safely shared between threads.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct AtomicBool {
     v: UnsafeCell<usize>,
 }
@@ -86,7 +87,7 @@ pub struct AtomicBool {
 unsafe impl Sync for AtomicBool {}
 
 /// A signed integer type which can be safely shared between threads.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct AtomicIsize {
     v: UnsafeCell<isize>,
 }
@@ -94,7 +95,7 @@ pub struct AtomicIsize {
 unsafe impl Sync for AtomicIsize {}
 
 /// An unsigned integer type which can be safely shared between threads.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct AtomicUsize {
     v: UnsafeCell<usize>,
 }
@@ -102,9 +103,10 @@ pub struct AtomicUsize {
 unsafe impl Sync for AtomicUsize {}
 
 /// A raw pointer type which can be safely shared between threads.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct AtomicPtr<T> {
     p: UnsafeCell<usize>,
+    _marker: PhantomData<*mut T>,
 }
 
 unsafe impl<T> Sync for AtomicPtr<T> {}
@@ -119,42 +121,42 @@ unsafe impl<T> Sync for AtomicPtr<T> {}
 ///
 /// Rust's memory orderings are [the same as
 /// C++'s](http://gcc.gnu.org/wiki/Atomic/GCCMM/AtomicSync).
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 #[derive(Copy)]
 pub enum Ordering {
     /// No ordering constraints, only atomic operations.
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     Relaxed,
     /// When coupled with a store, all previous writes become visible
     /// to another thread that performs a load with `Acquire` ordering
     /// on the same value.
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     Release,
     /// When coupled with a load, all subsequent loads will see data
     /// written before a store with `Release` ordering on the same value
     /// in another thread.
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     Acquire,
     /// When coupled with a load, uses `Acquire` ordering, and with a store
     /// `Release` ordering.
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     AcqRel,
     /// Like `AcqRel` with the additional guarantee that all threads see all
     /// sequentially consistent operations in the same order.
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     SeqCst,
 }
 
 /// An `AtomicBool` initialized to `false`.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub const ATOMIC_BOOL_INIT: AtomicBool =
         AtomicBool { v: UnsafeCell { value: 0 } };
 /// An `AtomicIsize` initialized to `0`.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub const ATOMIC_ISIZE_INIT: AtomicIsize =
         AtomicIsize { v: UnsafeCell { value: 0 } };
 /// An `AtomicUsize` initialized to `0`.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub const ATOMIC_USIZE_INIT: AtomicUsize =
         AtomicUsize { v: UnsafeCell { value: 0, } };
 
@@ -173,7 +175,7 @@ impl AtomicBool {
     /// let atomic_false = AtomicBool::new(false);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(v: bool) -> AtomicBool {
         let val = if v { UINT_TRUE } else { 0 };
         AtomicBool { v: UnsafeCell::new(val) }
@@ -197,7 +199,7 @@ impl AtomicBool {
     /// let value = some_bool.load(Ordering::Relaxed);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn load(&self, order: Ordering) -> bool {
         unsafe { atomic_load(self.v.get(), order) > 0 }
     }
@@ -220,7 +222,7 @@ impl AtomicBool {
     ///
     /// Panics if `order` is `Acquire` or `AcqRel`.
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn store(&self, val: bool, order: Ordering) {
         let val = if val { UINT_TRUE } else { 0 };
 
@@ -241,7 +243,7 @@ impl AtomicBool {
     /// let value = some_bool.swap(false, Ordering::Relaxed);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn swap(&self, val: bool, order: Ordering) -> bool {
         let val = if val { UINT_TRUE } else { 0 };
 
@@ -265,7 +267,7 @@ impl AtomicBool {
     /// let value = some_bool.store(false, Ordering::Relaxed);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn compare_and_swap(&self, old: bool, new: bool, order: Ordering) -> bool {
         let old = if old { UINT_TRUE } else { 0 };
         let new = if new { UINT_TRUE } else { 0 };
@@ -298,7 +300,7 @@ impl AtomicBool {
     /// assert_eq!(false, foo.load(Ordering::SeqCst));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_and(&self, val: bool, order: Ordering) -> bool {
         let val = if val { UINT_TRUE } else { 0 };
 
@@ -331,7 +333,7 @@ impl AtomicBool {
     /// assert_eq!(true, foo.load(Ordering::SeqCst));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_nand(&self, val: bool, order: Ordering) -> bool {
         let val = if val { UINT_TRUE } else { 0 };
 
@@ -363,7 +365,7 @@ impl AtomicBool {
     /// assert_eq!(false, foo.load(Ordering::SeqCst));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_or(&self, val: bool, order: Ordering) -> bool {
         let val = if val { UINT_TRUE } else { 0 };
 
@@ -395,7 +397,7 @@ impl AtomicBool {
     /// assert_eq!(false, foo.load(Ordering::SeqCst));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_xor(&self, val: bool, order: Ordering) -> bool {
         let val = if val { UINT_TRUE } else { 0 };
 
@@ -403,7 +405,7 @@ impl AtomicBool {
     }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl AtomicIsize {
     /// Creates a new `AtomicIsize`.
     ///
@@ -415,6 +417,7 @@ impl AtomicIsize {
     /// let atomic_forty_two  = AtomicIsize::new(42);
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(v: isize) -> AtomicIsize {
         AtomicIsize {v: UnsafeCell::new(v)}
     }
@@ -437,6 +440,7 @@ impl AtomicIsize {
     /// let value = some_isize.load(Ordering::Relaxed);
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn load(&self, order: Ordering) -> isize {
         unsafe { atomic_load(self.v.get(), order) }
     }
@@ -459,6 +463,7 @@ impl AtomicIsize {
     ///
     /// Panics if `order` is `Acquire` or `AcqRel`.
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn store(&self, val: isize, order: Ordering) {
         unsafe { atomic_store(self.v.get(), val, order); }
     }
@@ -477,6 +482,7 @@ impl AtomicIsize {
     /// let value = some_isize.swap(10, Ordering::Relaxed);
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn swap(&self, val: isize, order: Ordering) -> isize {
         unsafe { atomic_swap(self.v.get(), val, order) }
     }
@@ -498,6 +504,7 @@ impl AtomicIsize {
     /// let value = some_isize.compare_and_swap(5, 10, Ordering::Relaxed);
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn compare_and_swap(&self, old: isize, new: isize, order: Ordering) -> isize {
         unsafe { atomic_compare_and_swap(self.v.get(), old, new, order) }
     }
@@ -514,6 +521,7 @@ impl AtomicIsize {
     /// assert_eq!(10, foo.load(Ordering::SeqCst));
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_add(&self, val: isize, order: Ordering) -> isize {
         unsafe { atomic_add(self.v.get(), val, order) }
     }
@@ -530,6 +538,7 @@ impl AtomicIsize {
     /// assert_eq!(-10, foo.load(Ordering::SeqCst));
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_sub(&self, val: isize, order: Ordering) -> isize {
         unsafe { atomic_sub(self.v.get(), val, order) }
     }
@@ -545,6 +554,7 @@ impl AtomicIsize {
     /// assert_eq!(0b101101, foo.fetch_and(0b110011, Ordering::SeqCst));
     /// assert_eq!(0b100001, foo.load(Ordering::SeqCst));
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_and(&self, val: isize, order: Ordering) -> isize {
         unsafe { atomic_and(self.v.get(), val, order) }
     }
@@ -560,6 +570,7 @@ impl AtomicIsize {
     /// assert_eq!(0b101101, foo.fetch_or(0b110011, Ordering::SeqCst));
     /// assert_eq!(0b111111, foo.load(Ordering::SeqCst));
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_or(&self, val: isize, order: Ordering) -> isize {
         unsafe { atomic_or(self.v.get(), val, order) }
     }
@@ -575,12 +586,13 @@ impl AtomicIsize {
     /// assert_eq!(0b101101, foo.fetch_xor(0b110011, Ordering::SeqCst));
     /// assert_eq!(0b011110, foo.load(Ordering::SeqCst));
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_xor(&self, val: isize, order: Ordering) -> isize {
         unsafe { atomic_xor(self.v.get(), val, order) }
     }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl AtomicUsize {
     /// Creates a new `AtomicUsize`.
     ///
@@ -592,6 +604,7 @@ impl AtomicUsize {
     /// let atomic_forty_two = AtomicUsize::new(42);
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(v: usize) -> AtomicUsize {
         AtomicUsize { v: UnsafeCell::new(v) }
     }
@@ -614,6 +627,7 @@ impl AtomicUsize {
     /// let value = some_usize.load(Ordering::Relaxed);
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn load(&self, order: Ordering) -> usize {
         unsafe { atomic_load(self.v.get(), order) }
     }
@@ -636,6 +650,7 @@ impl AtomicUsize {
     ///
     /// Panics if `order` is `Acquire` or `AcqRel`.
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn store(&self, val: usize, order: Ordering) {
         unsafe { atomic_store(self.v.get(), val, order); }
     }
@@ -654,6 +669,7 @@ impl AtomicUsize {
     /// let value = some_usize.swap(10, Ordering::Relaxed);
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn swap(&self, val: usize, order: Ordering) -> usize {
         unsafe { atomic_swap(self.v.get(), val, order) }
     }
@@ -675,6 +691,7 @@ impl AtomicUsize {
     /// let value = some_usize.compare_and_swap(5, 10, Ordering::Relaxed);
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn compare_and_swap(&self, old: usize, new: usize, order: Ordering) -> usize {
         unsafe { atomic_compare_and_swap(self.v.get(), old, new, order) }
     }
@@ -691,6 +708,7 @@ impl AtomicUsize {
     /// assert_eq!(10, foo.load(Ordering::SeqCst));
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_add(&self, val: usize, order: Ordering) -> usize {
         unsafe { atomic_add(self.v.get(), val, order) }
     }
@@ -707,6 +725,7 @@ impl AtomicUsize {
     /// assert_eq!(0, foo.load(Ordering::SeqCst));
     /// ```
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_sub(&self, val: usize, order: Ordering) -> usize {
         unsafe { atomic_sub(self.v.get(), val, order) }
     }
@@ -722,6 +741,7 @@ impl AtomicUsize {
     /// assert_eq!(0b101101, foo.fetch_and(0b110011, Ordering::SeqCst));
     /// assert_eq!(0b100001, foo.load(Ordering::SeqCst));
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_and(&self, val: usize, order: Ordering) -> usize {
         unsafe { atomic_and(self.v.get(), val, order) }
     }
@@ -737,6 +757,7 @@ impl AtomicUsize {
     /// assert_eq!(0b101101, foo.fetch_or(0b110011, Ordering::SeqCst));
     /// assert_eq!(0b111111, foo.load(Ordering::SeqCst));
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_or(&self, val: usize, order: Ordering) -> usize {
         unsafe { atomic_or(self.v.get(), val, order) }
     }
@@ -752,6 +773,7 @@ impl AtomicUsize {
     /// assert_eq!(0b101101, foo.fetch_xor(0b110011, Ordering::SeqCst));
     /// assert_eq!(0b011110, foo.load(Ordering::SeqCst));
     #[inline]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn fetch_xor(&self, val: usize, order: Ordering) -> usize {
         unsafe { atomic_xor(self.v.get(), val, order) }
     }
@@ -769,9 +791,10 @@ impl<T> AtomicPtr<T> {
     /// let atomic_ptr  = AtomicPtr::new(ptr);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(p: *mut T) -> AtomicPtr<T> {
-        AtomicPtr { p: UnsafeCell::new(p as usize) }
+        AtomicPtr { p: UnsafeCell::new(p as usize),
+                    _marker: PhantomData }
     }
 
     /// Loads a value from the pointer.
@@ -793,7 +816,7 @@ impl<T> AtomicPtr<T> {
     /// let value = some_ptr.load(Ordering::Relaxed);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn load(&self, order: Ordering) -> *mut T {
         unsafe {
             atomic_load(self.p.get(), order) as *mut T
@@ -821,7 +844,7 @@ impl<T> AtomicPtr<T> {
     ///
     /// Panics if `order` is `Acquire` or `AcqRel`.
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn store(&self, ptr: *mut T, order: Ordering) {
         unsafe { atomic_store(self.p.get(), ptr as usize, order); }
     }
@@ -843,7 +866,7 @@ impl<T> AtomicPtr<T> {
     /// let value = some_ptr.swap(other_ptr, Ordering::Relaxed);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn swap(&self, ptr: *mut T, order: Ordering) -> *mut T {
         unsafe { atomic_swap(self.p.get(), ptr as usize, order) as *mut T }
     }
@@ -869,7 +892,7 @@ impl<T> AtomicPtr<T> {
     /// let value = some_ptr.compare_and_swap(other_ptr, another_ptr, Ordering::Relaxed);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn compare_and_swap(&self, old: *mut T, new: *mut T, order: Ordering) -> *mut T {
         unsafe {
             atomic_compare_and_swap(self.p.get(), old as usize,
@@ -890,7 +913,7 @@ unsafe fn atomic_store<T>(dst: *mut T, val: T, order:Ordering) {
 }
 
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_load<T>(dst: *const T, order:Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_load_acq(dst),
@@ -902,7 +925,7 @@ unsafe fn atomic_load<T>(dst: *const T, order:Ordering) -> T {
 }
 
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_swap<T>(dst: *mut T, val: T, order: Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_xchg_acq(dst, val),
@@ -915,7 +938,7 @@ unsafe fn atomic_swap<T>(dst: *mut T, val: T, order: Ordering) -> T {
 
 /// Returns the old value (like __sync_fetch_and_add).
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_add<T>(dst: *mut T, val: T, order: Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_xadd_acq(dst, val),
@@ -928,7 +951,7 @@ unsafe fn atomic_add<T>(dst: *mut T, val: T, order: Ordering) -> T {
 
 /// Returns the old value (like __sync_fetch_and_sub).
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_sub<T>(dst: *mut T, val: T, order: Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_xsub_acq(dst, val),
@@ -940,7 +963,7 @@ unsafe fn atomic_sub<T>(dst: *mut T, val: T, order: Ordering) -> T {
 }
 
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_compare_and_swap<T>(dst: *mut T, old:T, new:T, order: Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_cxchg_acq(dst, old, new),
@@ -952,7 +975,7 @@ unsafe fn atomic_compare_and_swap<T>(dst: *mut T, old:T, new:T, order: Ordering)
 }
 
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_and<T>(dst: *mut T, val: T, order: Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_and_acq(dst, val),
@@ -964,7 +987,7 @@ unsafe fn atomic_and<T>(dst: *mut T, val: T, order: Ordering) -> T {
 }
 
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_nand<T>(dst: *mut T, val: T, order: Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_nand_acq(dst, val),
@@ -977,7 +1000,7 @@ unsafe fn atomic_nand<T>(dst: *mut T, val: T, order: Ordering) -> T {
 
 
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_or<T>(dst: *mut T, val: T, order: Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_or_acq(dst, val),
@@ -990,7 +1013,7 @@ unsafe fn atomic_or<T>(dst: *mut T, val: T, order: Ordering) -> T {
 
 
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 unsafe fn atomic_xor<T>(dst: *mut T, val: T, order: Ordering) -> T {
     match order {
         Acquire => intrinsics::atomic_xor_acq(dst, val),
@@ -1023,7 +1046,7 @@ unsafe fn atomic_xor<T>(dst: *mut T, val: T, order: Ordering) -> T {
 ///
 /// Panics if `order` is `Relaxed`.
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub fn fence(order: Ordering) {
     unsafe {
         match order {
@@ -1036,27 +1059,37 @@ pub fn fence(order: Ordering) {
     }
 }
 
-#[deprecated="renamed to AtomicIsize"]
+#[unstable(feature = "core")]
+#[deprecated(since = "1.0.0",
+             reason = "renamed to AtomicIsize")]
 #[allow(missing_docs)]
 pub struct AtomicInt {
     v: UnsafeCell<int>,
 }
 
+#[allow(deprecated)]
 unsafe impl Sync for AtomicInt {}
 
-#[deprecated="renamed to AtomicUsize"]
+#[unstable(feature = "core")]
+#[deprecated(since = "1.0.0",
+             reason = "renamed to AtomicUsize")]
 #[allow(missing_docs)]
 pub struct AtomicUint {
     v: UnsafeCell<uint>,
 }
 
+#[allow(deprecated)]
 unsafe impl Sync for AtomicUint {}
 
-#[deprecated="use ATOMIC_ISIZE_INIT instead"]
+#[unstable(feature = "core")]
+#[deprecated(since = "1.0.0",
+             reason = "use ATOMIC_ISIZE_INIT instead")]
 #[allow(missing_docs, deprecated)]
 pub const ATOMIC_INT_INIT: AtomicInt =
         AtomicInt { v: UnsafeCell { value: 0 } };
-#[deprecated="use ATOMIC_USIZE_INIT instead"]
+#[unstable(feature = "core")]
+#[deprecated(since = "1.0.0",
+             reason = "use ATOMIC_USIZE_INIT instead")]
 #[allow(missing_docs, deprecated)]
 pub const ATOMIC_UINT_INIT: AtomicUint =
         AtomicUint { v: UnsafeCell { value: 0, } };

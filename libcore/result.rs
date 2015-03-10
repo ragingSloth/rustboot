@@ -30,7 +30,7 @@
 //! defined and used like so:
 //!
 //! ```
-//! #[derive(Show)]
+//! #[derive(Debug)]
 //! enum Version { Version1, Version2 }
 //!
 //! fn parse_version(header: &[u8]) -> Result<Version, &'static str> {
@@ -224,13 +224,14 @@
 //!
 //! `try!` is imported by the prelude, and is available everywhere.
 
-#![stable]
+#![stable(feature = "rust1", since = "1.0.0")]
 
 use self::Result::{Ok, Err};
 
 use clone::Clone;
-use fmt::Debug;
-use iter::{Iterator, IteratorExt, DoubleEndedIterator, FromIterator, ExactSizeIterator};
+use fmt;
+use iter::{Iterator, IteratorExt, DoubleEndedIterator,
+           FromIterator, ExactSizeIterator, IntoIterator};
 use ops::{FnMut, FnOnce};
 use option::Option::{self, None, Some};
 use slice::AsSlice;
@@ -239,16 +240,16 @@ use slice;
 /// `Result` is a type that represents either success (`Ok`) or failure (`Err`).
 ///
 /// See the [`std::result`](index.html) module documentation for details.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Show, Hash)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 #[must_use]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub enum Result<T, E> {
     /// Contains the success value
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     Ok(T),
 
     /// Contains the error value
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     Err(E)
 }
 
@@ -256,7 +257,7 @@ pub enum Result<T, E> {
 // Type implementation
 /////////////////////////////////////////////////////////////////////////////
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T, E> Result<T, E> {
     /////////////////////////////////////////////////////////////////////////
     // Querying the contained values
@@ -274,7 +275,7 @@ impl<T, E> Result<T, E> {
     /// assert_eq!(x.is_ok(), false);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn is_ok(&self) -> bool {
         match *self {
             Ok(_) => true,
@@ -294,7 +295,7 @@ impl<T, E> Result<T, E> {
     /// assert_eq!(x.is_err(), true);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn is_err(&self) -> bool {
         !self.is_ok()
     }
@@ -311,14 +312,14 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// let x: Result<uint, &str> = Ok(2);
+    /// let x: Result<u32, &str> = Ok(2);
     /// assert_eq!(x.ok(), Some(2));
     ///
-    /// let x: Result<uint, &str> = Err("Nothing here");
+    /// let x: Result<u32, &str> = Err("Nothing here");
     /// assert_eq!(x.ok(), None);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn ok(self) -> Option<T> {
         match self {
             Ok(x)  => Some(x),
@@ -334,14 +335,14 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// let x: Result<uint, &str> = Ok(2);
+    /// let x: Result<u32, &str> = Ok(2);
     /// assert_eq!(x.err(), None);
     ///
-    /// let x: Result<uint, &str> = Err("Nothing here");
+    /// let x: Result<u32, &str> = Err("Nothing here");
     /// assert_eq!(x.err(), Some("Nothing here"));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn err(self) -> Option<E> {
         match self {
             Ok(_)  => None,
@@ -359,14 +360,14 @@ impl<T, E> Result<T, E> {
     /// into the original, leaving the original in place.
     ///
     /// ```
-    /// let x: Result<uint, &str> = Ok(2);
+    /// let x: Result<u32, &str> = Ok(2);
     /// assert_eq!(x.as_ref(), Ok(&2));
     ///
-    /// let x: Result<uint, &str> = Err("Error");
+    /// let x: Result<u32, &str> = Err("Error");
     /// assert_eq!(x.as_ref(), Err(&"Error"));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn as_ref(&self) -> Result<&T, &E> {
         match *self {
             Ok(ref x) => Ok(x),
@@ -393,7 +394,7 @@ impl<T, E> Result<T, E> {
     /// assert_eq!(x.unwrap_err(), 0);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn as_mut(&mut self) -> Result<&mut T, &mut E> {
         match *self {
             Ok(ref mut x) => Ok(x),
@@ -404,7 +405,7 @@ impl<T, E> Result<T, E> {
     /// Convert from `Result<T, E>` to `&mut [T]` (without copying)
     ///
     /// ```
-    /// let mut x: Result<&str, uint> = Ok("Gold");
+    /// let mut x: Result<&str, u32> = Ok("Gold");
     /// {
     ///     let v = x.as_mut_slice();
     ///     assert!(v == ["Gold"]);
@@ -413,11 +414,12 @@ impl<T, E> Result<T, E> {
     /// }
     /// assert_eq!(x, Ok("Silver"));
     ///
-    /// let mut x: Result<&str, uint> = Err(45);
+    /// let mut x: Result<&str, u32> = Err(45);
     /// assert!(x.as_mut_slice().is_empty());
     /// ```
     #[inline]
-    #[unstable = "waiting for mut conventions"]
+    #[unstable(feature = "core",
+               reason = "waiting for mut conventions")]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         match *self {
             Ok(ref mut x) => slice::mut_ref_slice(x),
@@ -454,7 +456,7 @@ impl<T, E> Result<T, E> {
     ///     let line: IoResult<String> = buffer.read_line();
     ///     // Convert the string line to a number using `map` and `from_str`
     ///     let val: IoResult<int> = line.map(|line| {
-    ///         line.as_slice().trim_right().parse::<int>().unwrap_or(0)
+    ///         line.trim_right().parse::<int>().unwrap_or(0)
     ///     });
     ///     // Add the value if there were no errors, otherwise add 0
     ///     sum += val.ok().unwrap_or(0);
@@ -463,7 +465,7 @@ impl<T, E> Result<T, E> {
     /// assert!(sum == 10);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn map<U, F: FnOnce(T) -> U>(self, op: F) -> Result<U,E> {
         match self {
             Ok(t) => Ok(op(t)),
@@ -480,16 +482,16 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// fn stringify(x: uint) -> String { format!("error code: {}", x) }
+    /// fn stringify(x: u32) -> String { format!("error code: {}", x) }
     ///
-    /// let x: Result<uint, uint> = Ok(2);
+    /// let x: Result<u32, u32> = Ok(2);
     /// assert_eq!(x.map_err(stringify), Ok(2));
     ///
-    /// let x: Result<uint, uint> = Err(13);
+    /// let x: Result<u32, u32> = Err(13);
     /// assert_eq!(x.map_err(stringify), Err("error code: 13".to_string()));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn map_err<F, O: FnOnce(E) -> F>(self, op: O) -> Result<T,F> {
         match self {
             Ok(t) => Ok(t),
@@ -506,14 +508,14 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// let x: Result<uint, &str> = Ok(7);
+    /// let x: Result<u32, &str> = Ok(7);
     /// assert_eq!(x.iter().next(), Some(&7));
     ///
-    /// let x: Result<uint, &str> = Err("nothing!");
+    /// let x: Result<u32, &str> = Err("nothing!");
     /// assert_eq!(x.iter().next(), None);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn iter(&self) -> Iter<T> {
         Iter { inner: self.as_ref().ok() }
     }
@@ -523,18 +525,18 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// let mut x: Result<uint, &str> = Ok(7);
+    /// let mut x: Result<u32, &str> = Ok(7);
     /// match x.iter_mut().next() {
     ///     Some(&mut ref mut x) => *x = 40,
     ///     None => {},
     /// }
     /// assert_eq!(x, Ok(40));
     ///
-    /// let mut x: Result<uint, &str> = Err("nothing!");
+    /// let mut x: Result<u32, &str> = Err("nothing!");
     /// assert_eq!(x.iter_mut().next(), None);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn iter_mut(&mut self) -> IterMut<T> {
         IterMut { inner: self.as_mut().ok() }
     }
@@ -544,16 +546,16 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// let x: Result<uint, &str> = Ok(5);
-    /// let v: Vec<uint> = x.into_iter().collect();
-    /// assert_eq!(v, vec![5]);
+    /// let x: Result<u32, &str> = Ok(5);
+    /// let v: Vec<u32> = x.into_iter().collect();
+    /// assert_eq!(v, [5]);
     ///
-    /// let x: Result<uint, &str> = Err("nothing!");
-    /// let v: Vec<uint> = x.into_iter().collect();
-    /// assert_eq!(v, vec![]);
+    /// let x: Result<u32, &str> = Err("nothing!");
+    /// let v: Vec<u32> = x.into_iter().collect();
+    /// assert_eq!(v, []);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn into_iter(self) -> IntoIter<T> {
         IntoIter { inner: self.ok() }
     }
@@ -567,24 +569,24 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// let x: Result<uint, &str> = Ok(2);
+    /// let x: Result<u32, &str> = Ok(2);
     /// let y: Result<&str, &str> = Err("late error");
     /// assert_eq!(x.and(y), Err("late error"));
     ///
-    /// let x: Result<uint, &str> = Err("early error");
+    /// let x: Result<u32, &str> = Err("early error");
     /// let y: Result<&str, &str> = Ok("foo");
     /// assert_eq!(x.and(y), Err("early error"));
     ///
-    /// let x: Result<uint, &str> = Err("not a 2");
+    /// let x: Result<u32, &str> = Err("not a 2");
     /// let y: Result<&str, &str> = Err("late error");
     /// assert_eq!(x.and(y), Err("not a 2"));
     ///
-    /// let x: Result<uint, &str> = Ok(2);
+    /// let x: Result<u32, &str> = Ok(2);
     /// let y: Result<&str, &str> = Ok("different result type");
     /// assert_eq!(x.and(y), Ok("different result type"));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn and<U>(self, res: Result<U, E>) -> Result<U, E> {
         match self {
             Ok(_) => res,
@@ -599,8 +601,8 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// fn sq(x: uint) -> Result<uint, uint> { Ok(x * x) }
-    /// fn err(x: uint) -> Result<uint, uint> { Err(x) }
+    /// fn sq(x: u32) -> Result<u32, u32> { Ok(x * x) }
+    /// fn err(x: u32) -> Result<u32, u32> { Err(x) }
     ///
     /// assert_eq!(Ok(2).and_then(sq).and_then(sq), Ok(16));
     /// assert_eq!(Ok(2).and_then(sq).and_then(err), Err(4));
@@ -608,7 +610,7 @@ impl<T, E> Result<T, E> {
     /// assert_eq!(Err(3).and_then(sq).and_then(sq), Err(3));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn and_then<U, F: FnOnce(T) -> Result<U, E>>(self, op: F) -> Result<U, E> {
         match self {
             Ok(t) => op(t),
@@ -621,27 +623,27 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// let x: Result<uint, &str> = Ok(2);
-    /// let y: Result<uint, &str> = Err("late error");
+    /// let x: Result<u32, &str> = Ok(2);
+    /// let y: Result<u32, &str> = Err("late error");
     /// assert_eq!(x.or(y), Ok(2));
     ///
-    /// let x: Result<uint, &str> = Err("early error");
-    /// let y: Result<uint, &str> = Ok(2);
+    /// let x: Result<u32, &str> = Err("early error");
+    /// let y: Result<u32, &str> = Ok(2);
     /// assert_eq!(x.or(y), Ok(2));
     ///
-    /// let x: Result<uint, &str> = Err("not a 2");
-    /// let y: Result<uint, &str> = Err("late error");
+    /// let x: Result<u32, &str> = Err("not a 2");
+    /// let y: Result<u32, &str> = Err("late error");
     /// assert_eq!(x.or(y), Err("late error"));
     ///
-    /// let x: Result<uint, &str> = Ok(2);
-    /// let y: Result<uint, &str> = Ok(100);
+    /// let x: Result<u32, &str> = Ok(2);
+    /// let y: Result<u32, &str> = Ok(100);
     /// assert_eq!(x.or(y), Ok(2));
     /// ```
     #[inline]
-    #[stable]
-    pub fn or(self, res: Result<T, E>) -> Result<T, E> {
+    #[stable(feature = "rust1", since = "1.0.0")]
+    pub fn or<F>(self, res: Result<T, F>) -> Result<T, F> {
         match self {
-            Ok(_) => self,
+            Ok(v) => Ok(v),
             Err(_) => res,
         }
     }
@@ -653,8 +655,8 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// fn sq(x: uint) -> Result<uint, uint> { Ok(x * x) }
-    /// fn err(x: uint) -> Result<uint, uint> { Err(x) }
+    /// fn sq(x: u32) -> Result<u32, u32> { Ok(x * x) }
+    /// fn err(x: u32) -> Result<u32, u32> { Err(x) }
     ///
     /// assert_eq!(Ok(2).or_else(sq).or_else(sq), Ok(2));
     /// assert_eq!(Ok(2).or_else(err).or_else(sq), Ok(2));
@@ -662,7 +664,7 @@ impl<T, E> Result<T, E> {
     /// assert_eq!(Err(3).or_else(err).or_else(err), Err(3));
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn or_else<F, O: FnOnce(E) -> Result<T, F>>(self, op: O) -> Result<T, F> {
         match self {
             Ok(t) => Ok(t),
@@ -677,14 +679,14 @@ impl<T, E> Result<T, E> {
     ///
     /// ```
     /// let optb = 2;
-    /// let x: Result<uint, &str> = Ok(9);
+    /// let x: Result<u32, &str> = Ok(9);
     /// assert_eq!(x.unwrap_or(optb), 9);
     ///
-    /// let x: Result<uint, &str> = Err("error");
+    /// let x: Result<u32, &str> = Err("error");
     /// assert_eq!(x.unwrap_or(optb), optb);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn unwrap_or(self, optb: T) -> T {
         match self {
             Ok(t) => t,
@@ -698,13 +700,13 @@ impl<T, E> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// fn count(x: &str) -> uint { x.len() }
+    /// fn count(x: &str) -> usize { x.len() }
     ///
     /// assert_eq!(Ok(2).unwrap_or_else(count), 2);
     /// assert_eq!(Err("foo").unwrap_or_else(count), 3);
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn unwrap_or_else<F: FnOnce(E) -> T>(self, op: F) -> T {
         match self {
             Ok(t) => t,
@@ -713,8 +715,8 @@ impl<T, E> Result<T, E> {
     }
 }
 
-#[stable]
-impl<T, E: Debug> Result<T, E> {
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<T, E: fmt::Debug> Result<T, E> {
     /// Unwraps a result, yielding the content of an `Ok`.
     ///
     /// # Panics
@@ -725,16 +727,16 @@ impl<T, E: Debug> Result<T, E> {
     /// # Example
     ///
     /// ```
-    /// let x: Result<uint, &str> = Ok(2);
+    /// let x: Result<u32, &str> = Ok(2);
     /// assert_eq!(x.unwrap(), 2);
     /// ```
     ///
     /// ```{.should_fail}
-    /// let x: Result<uint, &str> = Err("emergency failure");
+    /// let x: Result<u32, &str> = Err("emergency failure");
     /// x.unwrap(); // panics with `emergency failure`
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn unwrap(self) -> T {
         match self {
             Ok(t) => t,
@@ -744,8 +746,8 @@ impl<T, E: Debug> Result<T, E> {
     }
 }
 
-#[stable]
-impl<T: Debug, E> Result<T, E> {
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<T: fmt::Debug, E> Result<T, E> {
     /// Unwraps a result, yielding the content of an `Err`.
     ///
     /// # Panics
@@ -756,16 +758,16 @@ impl<T: Debug, E> Result<T, E> {
     /// # Example
     ///
     /// ```{.should_fail}
-    /// let x: Result<uint, &str> = Ok(2);
+    /// let x: Result<u32, &str> = Ok(2);
     /// x.unwrap_err(); // panics with `2`
     /// ```
     ///
     /// ```
-    /// let x: Result<uint, &str> = Err("emergency failure");
+    /// let x: Result<u32, &str> = Err("emergency failure");
     /// assert_eq!(x.unwrap_err(), "emergency failure");
     /// ```
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn unwrap_err(self) -> E {
         match self {
             Ok(t) =>
@@ -782,7 +784,7 @@ impl<T: Debug, E> Result<T, E> {
 impl<T, E> AsSlice<T> for Result<T, E> {
     /// Convert from `Result<T, E>` to `&[T]` (without copying)
     #[inline]
-    #[stable]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn as_slice<'a>(&'a self) -> &'a [T] {
         match *self {
             Ok(ref x) => slice::ref_slice(x),
@@ -800,29 +802,29 @@ impl<T, E> AsSlice<T> for Result<T, E> {
 /////////////////////////////////////////////////////////////////////////////
 
 /// An iterator over a reference to the `Ok` variant of a `Result`.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Iter<'a, T: 'a> { inner: Option<&'a T> }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
     #[inline]
     fn next(&mut self) -> Option<&'a T> { self.inner.take() }
     #[inline]
-    fn size_hint(&self) -> (uint, Option<uint>) {
+    fn size_hint(&self) -> (usize, Option<usize>) {
         let n = if self.inner.is_some() {1} else {0};
         (n, Some(n))
     }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a T> { self.inner.take() }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> ExactSizeIterator for Iter<'a, T> {}
 
 impl<'a, T> Clone for Iter<'a, T> {
@@ -830,62 +832,62 @@ impl<'a, T> Clone for Iter<'a, T> {
 }
 
 /// An iterator over a mutable reference to the `Ok` variant of a `Result`.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct IterMut<'a, T: 'a> { inner: Option<&'a mut T> }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
 
     #[inline]
     fn next(&mut self) -> Option<&'a mut T> { self.inner.take() }
     #[inline]
-    fn size_hint(&self) -> (uint, Option<uint>) {
+    fn size_hint(&self) -> (usize, Option<usize>) {
         let n = if self.inner.is_some() {1} else {0};
         (n, Some(n))
     }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a mut T> { self.inner.take() }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> ExactSizeIterator for IterMut<'a, T> {}
 
 /// An iterator over the value in a `Ok` variant of a `Result`.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct IntoIter<T> { inner: Option<T> }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
     #[inline]
     fn next(&mut self) -> Option<T> { self.inner.take() }
     #[inline]
-    fn size_hint(&self) -> (uint, Option<uint>) {
+    fn size_hint(&self) -> (usize, Option<usize>) {
         let n = if self.inner.is_some() {1} else {0};
         (n, Some(n))
     }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> DoubleEndedIterator for IntoIter<T> {
     #[inline]
     fn next_back(&mut self) -> Option<T> { self.inner.take() }
 }
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> ExactSizeIterator for IntoIter<T> {}
 
 /////////////////////////////////////////////////////////////////////////////
 // FromIterator
 /////////////////////////////////////////////////////////////////////////////
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<A, E, V: FromIterator<A>> FromIterator<Result<A, E>> for Result<V, E> {
     /// Takes each element in the `Iterator`: if it is an `Err`, no further
     /// elements are taken, and the `Err` is returned. Should no `Err` occur, a
@@ -895,17 +897,17 @@ impl<A, E, V: FromIterator<A>> FromIterator<Result<A, E>> for Result<V, E> {
     /// checking for overflow:
     ///
     /// ```rust
-    /// use std::uint;
+    /// use std::u32;
     ///
     /// let v = vec!(1, 2);
-    /// let res: Result<Vec<uint>, &'static str> = v.iter().map(|&x: &uint|
-    ///     if x == uint::MAX { Err("Overflow!") }
+    /// let res: Result<Vec<u32>, &'static str> = v.iter().map(|&x: &u32|
+    ///     if x == u32::MAX { Err("Overflow!") }
     ///     else { Ok(x + 1) }
     /// ).collect();
     /// assert!(res == Ok(vec!(2, 3)));
     /// ```
     #[inline]
-    fn from_iter<I: Iterator<Item=Result<A, E>>>(iter: I) -> Result<V, E> {
+    fn from_iter<I: IntoIterator<Item=Result<A, E>>>(iter: I) -> Result<V, E> {
         // FIXME(#11084): This could be replaced with Iterator::scan when this
         // performance bug is closed.
 
@@ -930,7 +932,7 @@ impl<A, E, V: FromIterator<A>> FromIterator<Result<A, E>> for Result<V, E> {
             }
         }
 
-        let mut adapter = Adapter { iter: iter, err: None };
+        let mut adapter = Adapter { iter: iter.into_iter(), err: None };
         let v: V = FromIterator::from_iter(adapter.by_ref());
 
         match adapter.err {
@@ -949,13 +951,13 @@ impl<A, E, V: FromIterator<A>> FromIterator<Result<A, E>> for Result<V, E> {
 /// If an `Err` is encountered, it is immediately returned.
 /// Otherwise, the folded value is returned.
 #[inline]
-#[unstable]
+#[unstable(feature = "core")]
 pub fn fold<T,
             V,
             E,
             F: FnMut(V, T) -> V,
             Iter: Iterator<Item=Result<T, E>>>(
-            mut iterator: Iter,
+            iterator: Iter,
             mut init: V,
             mut f: F)
             -> Result<V, E> {

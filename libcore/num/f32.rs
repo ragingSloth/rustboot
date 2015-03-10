@@ -14,7 +14,7 @@
 // FIXME: MIN_VALUE and MAX_VALUE literals are parsed as -inf and inf #14353
 #![allow(overflowing_literals)]
 
-#![stable]
+#![stable(feature = "rust1", since = "1.0.0")]
 
 use intrinsics;
 use mem;
@@ -22,46 +22,60 @@ use num::Float;
 use num::FpCategory as Fp;
 use option::Option;
 
-#[unstable = "pending integer conventions"]
-pub const RADIX: uint = 2;
+#[unstable(feature = "core", reason = "pending integer conventions")]
+pub const RADIX: u32 = 2;
 
-#[unstable = "pending integer conventions"]
-pub const MANTISSA_DIGITS: uint = 24;
-#[unstable = "pending integer conventions"]
-pub const DIGITS: uint = 6;
+#[unstable(feature = "core", reason = "pending integer conventions")]
+pub const MANTISSA_DIGITS: u32 = 24;
+#[unstable(feature = "core", reason = "pending integer conventions")]
+pub const DIGITS: u32 = 6;
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub const EPSILON: f32 = 1.19209290e-07_f32;
 
 /// Smallest finite f32 value
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
+#[deprecated(since = "1.0.0", reason = "use `std::f32::MIN`")]
 pub const MIN_VALUE: f32 = -3.40282347e+38_f32;
 /// Smallest positive, normalized f32 value
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
+#[deprecated(since = "1.0.0", reason = "use `std::f32::MIN_POSITIVE`")]
 pub const MIN_POS_VALUE: f32 = 1.17549435e-38_f32;
 /// Largest finite f32 value
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
+#[deprecated(since = "1.0.0", reason = "use `std::f32::MAX`")]
 pub const MAX_VALUE: f32 = 3.40282347e+38_f32;
 
-#[unstable = "pending integer conventions"]
-pub const MIN_EXP: int = -125;
-#[unstable = "pending integer conventions"]
-pub const MAX_EXP: int = 128;
+/// Smallest finite f32 value
+#[stable(feature = "rust1", since = "1.0.0")]
+pub const MIN: f32 = -3.40282347e+38_f32;
+/// Smallest positive, normalized f32 value
+#[stable(feature = "rust1", since = "1.0.0")]
+pub const MIN_POSITIVE: f32 = 1.17549435e-38_f32;
+/// Largest finite f32 value
+#[stable(feature = "rust1", since = "1.0.0")]
+pub const MAX: f32 = 3.40282347e+38_f32;
 
-#[unstable = "pending integer conventions"]
-pub const MIN_10_EXP: int = -37;
-#[unstable = "pending integer conventions"]
-pub const MAX_10_EXP: int = 38;
+#[unstable(feature = "core", reason = "pending integer conventions")]
+pub const MIN_EXP: i32 = -125;
+#[unstable(feature = "core", reason = "pending integer conventions")]
+pub const MAX_EXP: i32 = 128;
 
-#[stable]
+#[unstable(feature = "core", reason = "pending integer conventions")]
+pub const MIN_10_EXP: i32 = -37;
+#[unstable(feature = "core", reason = "pending integer conventions")]
+pub const MAX_10_EXP: i32 = 38;
+
+#[stable(feature = "rust1", since = "1.0.0")]
 pub const NAN: f32 = 0.0_f32/0.0_f32;
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub const INFINITY: f32 = 1.0_f32/0.0_f32;
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub const NEG_INFINITY: f32 = -1.0_f32/0.0_f32;
 
 /// Various useful constants.
-#[unstable = "naming scheme needs to be revisited"]
+#[unstable(feature = "core",
+           reason = "naming scheme needs to be revisited")]
 pub mod consts {
     // FIXME: replace with mathematical constants from cmath.
 
@@ -117,7 +131,7 @@ pub mod consts {
     pub const LN_10: f32 = 2.30258509299404568401799145468436421_f32;
 }
 
-#[unstable = "trait is unstable"]
+#[unstable(feature = "core", reason = "trait is unstable")]
 impl Float for f32 {
     #[inline]
     fn nan() -> f32 { NAN }
@@ -177,44 +191,54 @@ impl Float for f32 {
     }
 
     #[inline]
-    #[deprecated]
-    fn mantissa_digits(_: Option<f32>) -> uint { MANTISSA_DIGITS }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn mantissa_digits(_: Option<f32>) -> uint { MANTISSA_DIGITS as uint }
 
     #[inline]
-    #[deprecated]
-    fn digits(_: Option<f32>) -> uint { DIGITS }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn digits(_: Option<f32>) -> uint { DIGITS as uint }
 
     #[inline]
-    #[deprecated]
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
     fn epsilon() -> f32 { EPSILON }
 
     #[inline]
-    #[deprecated]
-    fn min_exp(_: Option<f32>) -> int { MIN_EXP }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn min_exp(_: Option<f32>) -> int { MIN_EXP as int }
 
     #[inline]
-    #[deprecated]
-    fn max_exp(_: Option<f32>) -> int { MAX_EXP }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn max_exp(_: Option<f32>) -> int { MAX_EXP as int }
 
     #[inline]
-    #[deprecated]
-    fn min_10_exp(_: Option<f32>) -> int { MIN_10_EXP }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn min_10_exp(_: Option<f32>) -> int { MIN_10_EXP as int }
 
     #[inline]
-    #[deprecated]
-    fn max_10_exp(_: Option<f32>) -> int { MAX_10_EXP }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn max_10_exp(_: Option<f32>) -> int { MAX_10_EXP as int }
 
     #[inline]
-    #[deprecated]
-    fn min_value() -> f32 { MIN_VALUE }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn min_value() -> f32 { MIN }
 
     #[inline]
-    #[deprecated]
-    fn min_pos_value(_: Option<f32>) -> f32 { MIN_POS_VALUE }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn min_pos_value(_: Option<f32>) -> f32 { MIN_POSITIVE }
 
     #[inline]
-    #[deprecated]
-    fn max_value() -> f32 { MAX_VALUE }
+    #[unstable(feature = "core")]
+    #[deprecated(since = "1.0.0")]
+    fn max_value() -> f32 { MAX }
 
     /// Returns the mantissa, exponent and sign as integers.
     fn integer_decode(self) -> (u64, i16, i8) {

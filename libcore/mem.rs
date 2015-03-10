@@ -13,13 +13,13 @@
 //! This module contains functions for querying the size and alignment of
 //! types, initializing and manipulating memory.
 
-#![stable]
+#![stable(feature = "rust1", since = "1.0.0")]
 
 use marker::Sized;
 use intrinsics;
 use ptr;
 
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub use intrinsics::transmute;
 
 /// Moves a thing into the void.
@@ -29,7 +29,7 @@ pub use intrinsics::transmute;
 ///
 /// This function is the unsafe version of the `drop` function because it does
 /// not run any destructors.
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub use intrinsics::forget;
 
 /// Returns the size of a type in bytes.
@@ -42,8 +42,8 @@ pub use intrinsics::forget;
 /// assert_eq!(4, mem::size_of::<i32>());
 /// ```
 #[inline]
-#[stable]
-pub fn size_of<T>() -> uint {
+#[stable(feature = "rust1", since = "1.0.0")]
+pub fn size_of<T>() -> usize {
     unsafe { intrinsics::size_of::<T>() }
 }
 
@@ -57,8 +57,8 @@ pub fn size_of<T>() -> uint {
 /// assert_eq!(4, mem::size_of_val(&5i32));
 /// ```
 #[inline]
-#[stable]
-pub fn size_of_val<T>(_val: &T) -> uint {
+#[stable(feature = "rust1", since = "1.0.0")]
+pub fn size_of_val<T>(_val: &T) -> usize {
     size_of::<T>()
 }
 
@@ -74,8 +74,8 @@ pub fn size_of_val<T>(_val: &T) -> uint {
 /// assert_eq!(4, mem::min_align_of::<i32>());
 /// ```
 #[inline]
-#[stable]
-pub fn min_align_of<T>() -> uint {
+#[stable(feature = "rust1", since = "1.0.0")]
+pub fn min_align_of<T>() -> usize {
     unsafe { intrinsics::min_align_of::<T>() }
 }
 
@@ -89,8 +89,8 @@ pub fn min_align_of<T>() -> uint {
 /// assert_eq!(4, mem::min_align_of_val(&5i32));
 /// ```
 #[inline]
-#[stable]
-pub fn min_align_of_val<T>(_val: &T) -> uint {
+#[stable(feature = "rust1", since = "1.0.0")]
+pub fn min_align_of_val<T>(_val: &T) -> usize {
     min_align_of::<T>()
 }
 
@@ -107,8 +107,8 @@ pub fn min_align_of_val<T>(_val: &T) -> uint {
 /// assert_eq!(4, mem::align_of::<i32>());
 /// ```
 #[inline]
-#[stable]
-pub fn align_of<T>() -> uint {
+#[stable(feature = "rust1", since = "1.0.0")]
+pub fn align_of<T>() -> usize {
     // We use the preferred alignment as the default alignment for a type. This
     // appears to be what clang migrated towards as well:
     //
@@ -129,8 +129,8 @@ pub fn align_of<T>() -> uint {
 /// assert_eq!(4, mem::align_of_val(&5i32));
 /// ```
 #[inline]
-#[stable]
-pub fn align_of_val<T>(_val: &T) -> uint {
+#[stable(feature = "rust1", since = "1.0.0")]
+pub fn align_of_val<T>(_val: &T) -> usize {
     align_of::<T>()
 }
 
@@ -150,10 +150,10 @@ pub fn align_of_val<T>(_val: &T) -> uint {
 /// ```
 /// use std::mem;
 ///
-/// let x: int = unsafe { mem::zeroed() };
+/// let x: i32 = unsafe { mem::zeroed() };
 /// ```
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub unsafe fn zeroed<T>() -> T {
     intrinsics::init()
 }
@@ -171,10 +171,10 @@ pub unsafe fn zeroed<T>() -> T {
 /// ```
 /// use std::mem;
 ///
-/// let x: int = unsafe { mem::uninitialized() };
+/// let x: i32 = unsafe { mem::uninitialized() };
 /// ```
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub unsafe fn uninitialized<T>() -> T {
     intrinsics::uninit()
 }
@@ -196,16 +196,16 @@ pub unsafe fn uninitialized<T>() -> T {
 /// assert_eq!(5, *y);
 /// ```
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub fn swap<T>(x: &mut T, y: &mut T) {
     unsafe {
         // Give ourselves some scratch space to work with
         let mut t: T = uninitialized();
 
         // Perform the swap, `&mut` pointers never alias
-        ptr::copy_nonoverlapping_memory(&mut t, &*x, 1);
-        ptr::copy_nonoverlapping_memory(x, &*y, 1);
-        ptr::copy_nonoverlapping_memory(y, &t, 1);
+        ptr::copy_nonoverlapping(&mut t, &*x, 1);
+        ptr::copy_nonoverlapping(x, &*y, 1);
+        ptr::copy_nonoverlapping(y, &t, 1);
 
         // y and t now point to the same thing, but we need to completely forget `t`
         // because it's no longer relevant.
@@ -261,7 +261,7 @@ pub fn swap<T>(x: &mut T, y: &mut T) {
 /// }
 /// ```
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub fn replace<T>(dest: &mut T, mut src: T) -> T {
     swap(dest, &mut src);
     src
@@ -288,7 +288,7 @@ pub fn replace<T>(dest: &mut T, mut src: T) -> T {
 /// println!("{}", *borrow);
 /// ```
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub fn drop<T>(_x: T) { }
 
 /// Interprets `src` as `&U`, and then reads `src` without moving the contained value.
@@ -311,15 +311,16 @@ pub fn drop<T>(_x: T) { }
 /// assert_eq!(1, one);
 /// ```
 #[inline]
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub unsafe fn transmute_copy<T, U>(src: &T) -> U {
     ptr::read(src as *const T as *const U)
 }
 
 /// Transforms lifetime of the second pointer to match the first.
 #[inline]
-#[unstable = "this function may be removed in the future due to its \
-              questionable utility"]
+#[unstable(feature = "core",
+           reason = "this function may be removed in the future due to its \
+                     questionable utility")]
 pub unsafe fn copy_lifetime<'a, S: ?Sized, T: ?Sized + 'a>(_ptr: &'a S,
                                                         ptr: &T) -> &'a T {
     transmute(ptr)
@@ -327,10 +328,12 @@ pub unsafe fn copy_lifetime<'a, S: ?Sized, T: ?Sized + 'a>(_ptr: &'a S,
 
 /// Transforms lifetime of the second mutable pointer to match the first.
 #[inline]
-#[unstable = "this function may be removed in the future due to its \
-              questionable utility"]
-pub unsafe fn copy_mut_lifetime<'a, S: ?Sized, T: ?Sized + 'a>(_ptr: &'a mut S,
-                                                            ptr: &mut T)
-                                                            -> &'a mut T {
+#[unstable(feature = "core",
+           reason = "this function may be removed in the future due to its \
+                     questionable utility")]
+pub unsafe fn copy_mut_lifetime<'a, S: ?Sized, T: ?Sized + 'a>(_ptr: &'a S,
+                                                               ptr: &mut T)
+                                                              -> &'a mut T
+{
     transmute(ptr)
 }
