@@ -18,6 +18,7 @@
 //!
 //! Their definition should always match the ABI defined in `rustc::back::abi`.
 
+use clone::Clone;
 use marker::Copy;
 use mem;
 
@@ -48,6 +49,7 @@ use mem;
 /// # Examples
 ///
 /// ```
+/// # #![feature(core)]
 /// use std::raw::{self, Repr};
 ///
 /// let slice: &[u16] = &[1, 2, 3, 4];
@@ -62,33 +64,23 @@ pub struct Slice<T> {
 }
 
 impl<T> Copy for Slice<T> {}
-
-/// The representation of an old closure.
-#[repr(C)]
-#[derive(Copy)]
-#[unstable(feature = "core")]
-#[deprecated(reason = "unboxed new closures do not have a universal representation; \
-                       `&Fn` (etc) trait objects should use `TraitObject` instead",
-             since= "1.0.0")]
-#[allow(deprecated) /* for deriving Copy impl */]
-pub struct Closure {
-    pub code: *mut (),
-    pub env: *mut (),
+impl<T> Clone for Slice<T> {
+    fn clone(&self) -> Slice<T> { *self }
 }
 
 /// The representation of a trait object like `&SomeTrait`.
 ///
 /// This struct has the same layout as types like `&SomeTrait` and
-/// `Box<AnotherTrait>`. The [Static and Dynamic Dispatch chapter of the
+/// `Box<AnotherTrait>`. The [Trait Objects chapter of the
 /// Book][moreinfo] contains more details about the precise nature of
 /// these internals.
 ///
-/// [moreinfo]: ../../book/static-and-dynamic-dispatch.html#representation
+/// [moreinfo]: ../../book/trait-objects.html#representation
 ///
 /// `TraitObject` is guaranteed to match layouts, but it is not the
 /// type of trait objects (e.g. the fields are not directly accessible
 /// on a `&SomeTrait`) nor does it control that layout (changing the
-/// definition will not change the layout of a `&SometTrait`). It is
+/// definition will not change the layout of a `&SomeTrait`). It is
 /// only designed to be used by unsafe code that needs to manipulate
 /// the low-level details.
 ///
@@ -106,6 +98,7 @@ pub struct Closure {
 /// # Examples
 ///
 /// ```
+/// # #![feature(core)]
 /// use std::mem;
 /// use std::raw;
 ///
@@ -147,7 +140,7 @@ pub struct Closure {
 /// assert_eq!(synthesized.bar(), 457);
 /// ```
 #[repr(C)]
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 pub struct TraitObject {
     pub data: *mut (),
     pub vtable: *mut (),

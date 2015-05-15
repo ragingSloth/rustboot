@@ -44,24 +44,6 @@
 
 use marker::Sized;
 
-pub type GlueFn = extern "Rust" fn(*const i8);
-
-#[lang="ty_desc"]
-#[derive(Copy)]
-pub struct TyDesc {
-    // sizeof(T)
-    pub size: usize,
-
-    // alignof(T)
-    pub align: usize,
-
-    // Called when a value of type `T` is no longer needed
-    pub drop_glue: GlueFn,
-
-    // Name corresponding to the type
-    pub name: &'static str,
-}
-
 extern "rust-intrinsic" {
 
     // NB: These intrinsics take unsafe pointers because they mutate aliased
@@ -157,16 +139,31 @@ extern "rust-intrinsic" {
     pub fn atomic_fence_rel();
     pub fn atomic_fence_acqrel();
 
-    /// Abort the execution of the process.
+    /// A compiler-only memory barrier.
+    ///
+    /// Memory accesses will never be reordered across this barrier by the compiler,
+    /// but no instructions will be emitted for it. This is appropriate for operations
+    /// on the same thread that may be preempted, such as when interacting with signal
+    /// handlers.
+    #[cfg(not(stage0))]     // SNAP 857ef6e
+    pub fn atomic_singlethreadfence();
+    #[cfg(not(stage0))]     // SNAP 857ef6e
+    pub fn atomic_singlethreadfence_acq();
+    #[cfg(not(stage0))]     // SNAP 857ef6e
+    pub fn atomic_singlethreadfence_rel();
+    #[cfg(not(stage0))]     // SNAP 857ef6e
+    pub fn atomic_singlethreadfence_acqrel();
+
+    /// Aborts the execution of the process.
     pub fn abort() -> !;
 
-    /// Tell LLVM that this point in the code is not reachable,
+    /// Tells LLVM that this point in the code is not reachable,
     /// enabling further optimizations.
     ///
     /// NB: This is very different from the `unreachable!()` macro!
     pub fn unreachable() -> !;
 
-    /// Inform the optimizer that a condition is always true.
+    /// Informs the optimizer that a condition is always true.
     /// If the condition is false, the behavior is undefined.
     ///
     /// No code is generated for this intrinsic, but the optimizer will try
@@ -176,7 +173,7 @@ extern "rust-intrinsic" {
     /// own, or if it does not enable any significant optimizations.
     pub fn assume(b: bool);
 
-    /// Execute a breakpoint trap, for inspection by a debugger.
+    /// Executes a breakpoint trap, for inspection by a debugger.
     pub fn breakpoint();
 
     /// The size of a type in bytes.
@@ -188,7 +185,7 @@ extern "rust-intrinsic" {
     /// elements.
     pub fn size_of<T>() -> usize;
 
-    /// Move a value to an uninitialized memory location.
+    /// Moves a value to an uninitialized memory location.
     ///
     /// Drop glue is not run on the destination.
     pub fn move_val_init<T>(dst: &mut T, src: T);
@@ -196,28 +193,52 @@ extern "rust-intrinsic" {
     pub fn min_align_of<T>() -> usize;
     pub fn pref_align_of<T>() -> usize;
 
-    /// Get a static pointer to a type descriptor.
-    pub fn get_tydesc<T: ?Sized>() -> *const TyDesc;
+    #[cfg(not(stage0))]
+    pub fn size_of_val<T: ?Sized>(_: &T) -> usize;
+    #[cfg(not(stage0))]
+    pub fn min_align_of_val<T: ?Sized>(_: &T) -> usize;
+    #[cfg(not(stage0))]
+    pub fn drop_in_place<T: ?Sized>(_: *mut T);
+
+    /// Gets a static string slice containing the name of a type.
+    pub fn type_name<T: ?Sized>() -> &'static str;
 
     /// Gets an identifier which is globally unique to the specified type. This
     /// function will return the same value for a type regardless of whichever
     /// crate it is invoked in.
     pub fn type_id<T: ?Sized + 'static>() -> u64;
 
-    /// Create a value initialized to zero.
+    /// Creates a value initialized to so that its drop flag,
+    /// if any, says that it has been dropped.
+    ///
+    /// `init_dropped` is unsafe because it returns a datum with all
+    /// of its bytes set to the drop flag, which generally does not
+    /// correspond to a valid value.
+    ///
+    /// This intrinsic is likely to be deprecated in the future when
+    /// Rust moves to non-zeroing dynamic drop (and thus removes the
+    /// embedded drop flags that are being established by this
+    /// intrinsic).
+    pub fn init_dropped<T>() -> T;
+
+    /// Creates a value initialized to zero.
     ///
     /// `init` is unsafe because it returns a zeroed-out datum,
-    /// which is unsafe unless T is Copy.
+    /// which is unsafe unless T is `Copy`.  Also, even if T is
+    /// `Copy`, an all-zero value may not correspond to any legitimate
+    /// state for the type in question.
     pub fn init<T>() -> T;
 
-    /// Create an uninitialized value.
+    /// Creates an uninitialized value.
+    ///
+    /// `uninit` is unsafe because there is no guarantee of what its
+    /// contents are. In particular its drop-flag may be set to any
+    /// state, which means it may claim either dropped or
+    /// undropped. In the general case one must use `ptr::write` to
+    /// initialize memory previous set to the result of `uninit`.
     pub fn uninit<T>() -> T;
 
-    /// Move a value out of scope without running drop glue.
-    ///
-    /// `forget` is unsafe because the caller is responsible for
-    /// ensuring the argument is deallocated already.
-    #[stable(feature = "rust1", since = "1.0.0")]
+    /// Moves a value out of scope without running drop glue.
     pub fn forget<T>(_: T) -> ();
 
     /// Unsafely transforms a value of one type into a value of another type.
@@ -249,21 +270,23 @@ extern "rust-intrinsic" {
     /// `Copy`, then may return `true` or `false`.
     pub fn needs_drop<T>() -> bool;
 
-    /// Returns `true` if a type is managed (will be allocated on the local heap)
-    pub fn owns_managed<T>() -> bool;
-
-    /// Calculates the offset from a pointer. The offset *must* be in-bounds of
-    /// the object, or one-byte-past-the-end. An arithmetic overflow is also
-    /// undefined behaviour.
+    /// Calculates the offset from a pointer.
     ///
     /// This is implemented as an intrinsic to avoid converting to and from an
     /// integer, since the conversion would throw away aliasing information.
+    ///
+    /// # Safety
+    ///
+    /// Both the starting and resulting pointer must be either in bounds or one
+    /// byte past the end of an allocated object. If either pointer is out of
+    /// bounds or arithmetic overflow occurs then any further use of the
+    /// returned value will result in undefined behavior.
     pub fn offset<T>(dst: *const T, offset: isize) -> *const T;
 
     /// Copies `count * size_of<T>` bytes from `src` to `dst`. The source
     /// and destination may *not* overlap.
     ///
-    /// `copy_nonoverlapping_memory` is semantically equivalent to C's `memcpy`.
+    /// `copy_nonoverlapping` is semantically equivalent to C's `memcpy`.
     ///
     /// # Safety
     ///
@@ -279,6 +302,7 @@ extern "rust-intrinsic" {
     /// A safe swap function:
     ///
     /// ```
+    /// # #![feature(core)]
     /// use std::mem;
     /// use std::ptr;
     ///
@@ -288,9 +312,9 @@ extern "rust-intrinsic" {
     ///         let mut t: T = mem::uninitialized();
     ///
     ///         // Perform the swap, `&mut` pointers never alias
-    ///         ptr::copy_nonoverlapping_memory(&mut t, &*x, 1);
-    ///         ptr::copy_nonoverlapping_memory(x, &*y, 1);
-    ///         ptr::copy_nonoverlapping_memory(y, &t, 1);
+    ///         ptr::copy_nonoverlapping(x, &mut t, 1);
+    ///         ptr::copy_nonoverlapping(y, x, 1);
+    ///         ptr::copy_nonoverlapping(&t, y, 1);
     ///
     ///         // y and t now point to the same thing, but we need to completely forget `tmp`
     ///         // because it's no longer relevant.
@@ -299,12 +323,12 @@ extern "rust-intrinsic" {
     /// }
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn copy_nonoverlapping_memory<T>(dst: *mut T, src: *const T, count: usize);
+    pub fn copy_nonoverlapping<T>(src: *const T, dst: *mut T, count: usize);
 
     /// Copies `count * size_of<T>` bytes from `src` to `dst`. The source
     /// and destination may overlap.
     ///
-    /// `copy_memory` is semantically equivalent to C's `memmove`.
+    /// `copy` is semantically equivalent to C's `memmove`.
     ///
     /// # Safety
     ///
@@ -318,23 +342,24 @@ extern "rust-intrinsic" {
     /// Efficiently create a Rust vector from an unsafe buffer:
     ///
     /// ```
+    /// # #![feature(core)]
     /// use std::ptr;
     ///
-    /// unsafe fn from_buf_raw<T>(ptr: *const T, elts: uint) -> Vec<T> {
+    /// unsafe fn from_buf_raw<T>(ptr: *const T, elts: usize) -> Vec<T> {
     ///     let mut dst = Vec::with_capacity(elts);
     ///     dst.set_len(elts);
-    ///     ptr::copy_memory(dst.as_mut_ptr(), ptr, elts);
+    ///     ptr::copy(ptr, dst.as_mut_ptr(), elts);
     ///     dst
     /// }
     /// ```
     ///
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn copy_memory<T>(dst: *mut T, src: *const T, count: usize);
+    pub fn copy<T>(src: *const T, dst: *mut T, count: usize);
 
     /// Invokes memset on the specified pointer, setting `count * size_of::<T>()`
     /// bytes of memory starting at `dst` to `c`.
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn set_memory<T>(dst: *mut T, val: u8, count: usize);
+    pub fn write_bytes<T>(dst: *mut T, val: u8, count: usize);
 
     /// Equivalent to the appropriate `llvm.memcpy.p0i8.0i8.*` intrinsic, with
     /// a size of `count` * `size_of::<T>()` and an alignment of
@@ -552,4 +577,25 @@ extern "rust-intrinsic" {
     pub fn overflowing_sub<T>(a: T, b: T) -> T;
     /// Returns (a * b) mod 2^N, where N is the width of N in bits.
     pub fn overflowing_mul<T>(a: T, b: T) -> T;
+
+    /// Returns the value of the discriminant for the variant in 'v',
+    /// cast to a `u64`; if `T` has no discriminant, returns 0.
+    pub fn discriminant_value<T>(v: &T) -> u64;
+}
+
+#[cfg(not(stage0))]
+extern "rust-intrinsic" {
+    /// Performs an unchecked signed division, which results in undefined behavior,
+    /// in cases where y == 0, or x == int::MIN and y == -1
+    pub fn unchecked_sdiv<T>(x: T, y: T) -> T;
+    /// Performs an unchecked unsigned division, which results in undefined behavior,
+    /// in cases where y == 0
+    pub fn unchecked_udiv<T>(x: T, y: T) -> T;
+
+    /// Returns the remainder of an unchecked signed division, which results in
+    /// undefined behavior, in cases where y == 0, or x == int::MIN and y == -1
+    pub fn unchecked_urem<T>(x: T, y: T) -> T;
+    /// Returns the remainder of an unchecked signed division, which results in
+    /// undefined behavior, in cases where y == 0
+    pub fn unchecked_srem<T>(x: T, y: T) -> T;
 }

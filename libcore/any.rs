@@ -55,7 +55,7 @@
 //! }
 //!
 //! // This function wants to log its parameter out prior to doing work with it.
-//! fn do_work<T: Debug + 'static>(value: &T) {
+//! fn do_work<T: Any + Debug>(value: &T) {
 //!     log(value);
 //!     // ...do some other work
 //! }
@@ -71,30 +71,33 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
+use fmt;
+use marker::Send;
 use mem::transmute;
 use option::Option::{self, Some, None};
 use raw::TraitObject;
 use intrinsics;
-use marker::Sized;
+use marker::{Reflect, Sized};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Any trait
 ///////////////////////////////////////////////////////////////////////////////
 
-/// The `Any` trait is implemented by all `'static` types, and can be used for
-/// dynamic typing
+/// A type to emulate dynamic typing.
 ///
-/// Every type with no non-`'static` references implements `Any`, so `Any` can
-/// be used as a trait object to emulate the effects dynamic typing.
+/// Every type with no non-`'static` references implements `Any`.
+/// See the [module-level documentation][mod] for more details.
+///
+/// [mod]: index.html
 #[stable(feature = "rust1", since = "1.0.0")]
-pub trait Any: 'static {
-    /// Get the `TypeId` of `self`
+pub trait Any: Reflect + 'static {
+    /// Gets the `TypeId` of `self`.
     #[unstable(feature = "core",
                reason = "this method will likely be replaced by an associated static")]
     fn get_type_id(&self) -> TypeId;
 }
 
-impl<T: 'static> Any for T {
+impl<T: Reflect + 'static> Any for T {
     fn get_type_id(&self) -> TypeId { TypeId::of::<T>() }
 }
 
@@ -102,11 +105,28 @@ impl<T: 'static> Any for T {
 // Extension methods for Any trait objects.
 ///////////////////////////////////////////////////////////////////////////////
 
+#[stable(feature = "rust1", since = "1.0.0")]
+impl fmt::Debug for Any {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("Any")
+    }
+}
+
+// Ensure that the result of e.g. joining a thread can be printed and
+// hence used with `unwrap`. May eventually no longer be needed if
+// dispatch works with upcasting.
+#[stable(feature = "rust1", since = "1.0.0")]
+impl fmt::Debug for Any + Send {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("Any")
+    }
+}
+
 impl Any {
     /// Returns true if the boxed type is the same as `T`
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
-    pub fn is<T: 'static>(&self) -> bool {
+    pub fn is<T: Any>(&self) -> bool {
         // Get TypeId of the type this function is instantiated with
         let t = TypeId::of::<T>();
 
@@ -121,7 +141,7 @@ impl Any {
     /// `None` if it isn't.
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
-    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         if self.is::<T>() {
             unsafe {
                 // Get the raw representation of the trait object
@@ -139,7 +159,7 @@ impl Any {
     /// `None` if it isn't.
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
-    pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
         if self.is::<T>() {
             unsafe {
                 // Get the raw representation of the trait object
@@ -153,6 +173,30 @@ impl Any {
         }
     }
 }
+
+impl Any+Send {
+    /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "rust1", since = "1.0.0")]
+    #[inline]
+    pub fn is<T: Any>(&self) -> bool {
+        Any::is::<T>(self)
+    }
+
+    /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "rust1", since = "1.0.0")]
+    #[inline]
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        Any::downcast_ref::<T>(self)
+    }
+
+    /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "rust1", since = "1.0.0")]
+    #[inline]
+    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
+        Any::downcast_mut::<T>(self)
+    }
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // TypeID and its methods
@@ -175,9 +219,8 @@ pub struct TypeId {
 impl TypeId {
     /// Returns the `TypeId` of the type this generic function has been
     /// instantiated with
-    #[unstable(feature = "core",
-               reason = "may grow a `Reflect` bound soon via marker traits")]
-    pub fn of<T: ?Sized + 'static>() -> TypeId {
+    #[stable(feature = "rust1", since = "1.0.0")]
+    pub fn of<T: ?Sized + Reflect + 'static>() -> TypeId {
         TypeId {
             t: unsafe { intrinsics::type_id::<T>() },
         }

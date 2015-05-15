@@ -29,8 +29,11 @@ clean:
 reset:
 	rm -rf *.o *.iso kernel.bin *.rlib
 
-run: kernel.bin
-	$(QEMU) -kernel $<
+run: test.iso
+	$(QEMU) -cdrom $<
+#run: kernel.bin
+#	$(QEMU) -kernel $<
 
-cd: kernel.bin
+
+test.iso: kernel.bin
 	./build_image.sh

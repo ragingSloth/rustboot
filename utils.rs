@@ -1,6 +1,7 @@
 #![macro_use]
 use core;
 use core::prelude::{Option, None, Some};
+use core::intrinsics::offset*;
 use core::ptr::PtrExt;
 
 pub fn outb(addr: u8, data: u8) {
@@ -32,11 +33,11 @@ pub fn inb(addr: u8) -> u8 {
 #[lang = "eh_personality"] extern fn eh_personality() {}
 #[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {}  }
 
-extern "rust-intrinsic" {
-    pub fn transmute<T, U>(x: T) -> U;
-    pub fn offset<T>(dst: *const T, offset: isize) -> *const T;
-    pub fn size_of<T>() -> usize;
-}
+//extern "rust-intrinsic" {
+//    pub fn transmute<T, U>(x: T) -> U;
+//    pub fn offset<T>(dst: *const T, offset: isize) -> *const T;
+//    pub fn size_of<T>() -> usize;
+//}
 
 //////////////////////////////////////////////////////
 //structs, traits, enums, impls

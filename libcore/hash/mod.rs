@@ -16,6 +16,7 @@
 //! # Examples
 //!
 //! ```rust
+//! # #![feature(hash)]
 //! use std::hash::{hash, Hash, SipHasher};
 //!
 //! #[derive(Hash)]
@@ -35,6 +36,7 @@
 //! the trait `Hash`:
 //!
 //! ```rust
+//! # #![feature(hash)]
 //! use std::hash::{hash, Hash, Hasher, SipHasher};
 //!
 //! struct Person {
@@ -60,7 +62,6 @@
 
 use prelude::*;
 
-use default::Default;
 use mem;
 
 pub use self::sip::SipHasher;
@@ -70,9 +71,17 @@ mod sip;
 /// A hashable type.
 ///
 /// The `H` type parameter is an abstract hash state that is used by the `Hash`
-/// to compute the hash. Specific implementations of this trait may specialize
-/// for particular instances of `H` in order to be able to optimize the hashing
-/// behavior.
+/// to compute the hash.
+///
+/// If you are also implementing `Eq`, there is an additional property that
+/// is important:
+///
+/// ```text
+/// k1 == k2 -> hash(k1) == hash(k2)
+/// ```
+///
+/// In other words, if two keys are equal, their hashes should also be equal.
+/// `HashMap` and `HashSet` both rely on this behavior.
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait Hash {
     /// Feeds this value into the state given, updating the hasher as necessary.
@@ -92,7 +101,7 @@ pub trait Hash {
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait Hasher {
     /// Completes a round of hashing, producing the output hash generated.
-    #[unstable(feature = "hash", reason = "module was recently redesigned")]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn finish(&self) -> u64;
 
     /// Writes some data into this `Hasher`
@@ -182,7 +191,9 @@ mod impls {
                 }
 
                 fn hash_slice<H: Hasher>(data: &[$ty], state: &mut H) {
-                    let newlen = data.len() * ::$ty::BYTES as usize;
+                    // FIXME(#23542) Replace with type ascription.
+                    #![allow(trivial_casts)]
+                    let newlen = data.len() * ::$ty::BYTES;
                     let ptr = data.as_ptr() as *const u8;
                     state.write(unsafe { slice::from_raw_parts(ptr, newlen) })
                 }

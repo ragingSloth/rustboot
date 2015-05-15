@@ -14,28 +14,6 @@
 //! implement comparison operators. Rust programs may implement `PartialOrd` to overload the `<`,
 //! `<=`, `>`, and `>=` operators, and may implement `PartialEq` to overload the `==` and `!=`
 //! operators.
-//!
-//! For example, to define a type with a customized definition for the PartialEq operators, you
-//! could do the following:
-//!
-//! ```
-//! use core::num::SignedInt;
-//!
-//! struct FuzzyNum {
-//!     num: i32,
-//! }
-//!
-//! impl PartialEq for FuzzyNum {
-//!     // Our custom eq allows numbers which are near each other to be equal! :D
-//!     fn eq(&self, other: &FuzzyNum) -> bool {
-//!         (self.num - other.num).abs() < 5
-//!     }
-//! }
-//!
-//! // Now these binary operators will work when applied!
-//! assert!(FuzzyNum { num: 37 } == FuzzyNum { num: 34 });
-//! assert!(FuzzyNum { num: 25 } != FuzzyNum { num: 57 });
-//! ```
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
@@ -63,9 +41,8 @@ use option::Option::{self, Some, None};
 /// PartialEq only requires the `eq` method to be implemented; `ne` is defined in terms of it by
 /// default. Any manual implementation of `ne` *must* respect the rule that `eq` is a strict
 /// inverse of `ne`; that is, `!(a == b)` if and only if `a != b`.
-#[lang="eq"]
+#[lang = "eq"]
 #[stable(feature = "rust1", since = "1.0.0")]
-#[old_orphan_check]
 pub trait PartialEq<Rhs: ?Sized = Self> {
     /// This method tests for `self` and `other` values to be equal, and is used by `==`.
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -245,7 +222,7 @@ impl PartialOrd for Ordering {
 /// However it remains possible to implement the others separately for types which do not have a
 /// total order. For example, for floating point numbers, `NaN < 0 == false` and `NaN >= 0 ==
 /// false` (cf. IEEE 754-2008 section 5.11).
-#[lang="ord"]
+#[lang = "ord"]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
     /// This method returns an ordering between `self` and `other` values if one exists.
@@ -361,6 +338,8 @@ pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
 
 /// Compare and return the minimum of two values.
 ///
+/// Returns the first argument if the comparison determines them to be equal.
+///
 /// # Examples
 ///
 /// ```
@@ -372,10 +351,12 @@ pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn min<T: Ord>(v1: T, v2: T) -> T {
-    if v1 < v2 { v1 } else { v2 }
+    if v1 <= v2 { v1 } else { v2 }
 }
 
 /// Compare and return the maximum of two values.
+///
+/// Returns the second argument if the comparison determines them to be equal.
 ///
 /// # Examples
 ///
@@ -388,7 +369,7 @@ pub fn min<T: Ord>(v1: T, v2: T) -> T {
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn max<T: Ord>(v1: T, v2: T) -> T {
-    if v1 > v2 { v1 } else { v2 }
+    if v2 >= v1 { v2 } else { v1 }
 }
 
 /// Compare and return the minimum of two values if there is one.
@@ -398,6 +379,7 @@ pub fn max<T: Ord>(v1: T, v2: T) -> T {
 /// # Examples
 ///
 /// ```
+/// # #![feature(core)]
 /// use std::cmp;
 ///
 /// assert_eq!(Some(1), cmp::partial_min(1, 2));
@@ -407,6 +389,7 @@ pub fn max<T: Ord>(v1: T, v2: T) -> T {
 /// When comparison is impossible:
 ///
 /// ```
+/// # #![feature(core)]
 /// use std::cmp;
 ///
 /// let result = cmp::partial_min(std::f64::NAN, 1.0);
@@ -424,11 +407,12 @@ pub fn partial_min<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
 
 /// Compare and return the maximum of two values if there is one.
 ///
-/// Returns the first argument if the comparison determines them to be equal.
+/// Returns the second argument if the comparison determines them to be equal.
 ///
 /// # Examples
 ///
 /// ```
+/// # #![feature(core)]
 /// use std::cmp;
 ///
 /// assert_eq!(Some(2), cmp::partial_max(1, 2));
@@ -438,6 +422,7 @@ pub fn partial_min<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
 /// When comparison is impossible:
 ///
 /// ```
+/// # #![feature(core)]
 /// use std::cmp;
 ///
 /// let result = cmp::partial_max(std::f64::NAN, 1.0);
@@ -447,8 +432,8 @@ pub fn partial_min<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
 #[unstable(feature = "core")]
 pub fn partial_max<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
     match v1.partial_cmp(&v2) {
-        Some(Less) => Some(v2),
-        Some(Equal) | Some(Greater) => Some(v1),
+        Some(Equal) | Some(Less) => Some(v2),
+        Some(Greater) => Some(v1),
         None => None
     }
 }

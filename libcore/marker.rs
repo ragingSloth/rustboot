@@ -33,21 +33,31 @@ use hash::Hasher;
 
 /// Types able to be transferred across thread boundaries.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[lang="send"]
+#[lang = "send"]
 #[rustc_on_unimplemented = "`{Self}` cannot be sent between threads safely"]
-pub unsafe trait Send : MarkerTrait {
+pub unsafe trait Send {
     // empty.
 }
 
+unsafe impl Send for .. { }
+
 impl<T> !Send for *const T { }
 impl<T> !Send for *mut T { }
-impl !Send for Managed { }
 
 /// Types with a constant size known at compile-time.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[lang="sized"]
+#[lang = "sized"]
 #[rustc_on_unimplemented = "`{Self}` does not have a constant size known at compile-time"]
-pub trait Sized : MarkerTrait {
+#[fundamental] // for Default, for example, which requires that `[T]: !Default` be evaluatable
+pub trait Sized {
+    // Empty.
+}
+
+/// Types that can be "unsized" to a dynamically sized type.
+#[unstable(feature = "core")]
+#[cfg(not(stage0))]
+#[lang="unsize"]
+pub trait Unsize<T> {
     // Empty.
 }
 
@@ -73,7 +83,7 @@ pub trait Sized : MarkerTrait {
 ///
 /// ```
 /// // we can just derive a `Copy` implementation
-/// #[derive(Debug, Copy)]
+/// #[derive(Debug, Copy, Clone)]
 /// struct Foo;
 ///
 /// let x = Foo;
@@ -122,7 +132,7 @@ pub trait Sized : MarkerTrait {
 /// There are two ways to implement `Copy` on your type:
 ///
 /// ```
-/// #[derive(Copy)]
+/// #[derive(Copy, Clone)]
 /// struct MyStruct;
 /// ```
 ///
@@ -131,6 +141,7 @@ pub trait Sized : MarkerTrait {
 /// ```
 /// struct MyStruct;
 /// impl Copy for MyStruct {}
+/// impl Clone for MyStruct { fn clone(&self) -> MyStruct { *self } }
 /// ```
 ///
 /// There is a small difference between the two: the `derive` strategy will also place a `Copy`
@@ -151,8 +162,8 @@ pub trait Sized : MarkerTrait {
 /// then it might be prudent to not implement `Copy`. This is because removing `Copy` is a breaking
 /// change: that second example would fail to compile if we made `Foo` non-`Copy`.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[lang="copy"]
-pub trait Copy : MarkerTrait {
+#[lang = "copy"]
+pub trait Copy : Clone {
     // Empty.
 }
 
@@ -193,36 +204,30 @@ pub trait Copy : MarkerTrait {
 /// the `sync` crate do ensure that any mutation cannot cause data
 /// races.  Hence these types are `Sync`.
 ///
-/// Any types with interior mutability must also use the `std::cell::UnsafeCell` wrapper around the
-/// value(s) which can be mutated when behind a `&` reference; not doing this is undefined
-/// behaviour (for example, `transmute`-ing from `&T` to `&mut T` is illegal).
+/// Any types with interior mutability must also use the `std::cell::UnsafeCell`
+/// wrapper around the value(s) which can be mutated when behind a `&`
+/// reference; not doing this is undefined behaviour (for example,
+/// `transmute`-ing from `&T` to `&mut T` is illegal).
 #[stable(feature = "rust1", since = "1.0.0")]
-#[lang="sync"]
+#[lang = "sync"]
 #[rustc_on_unimplemented = "`{Self}` cannot be shared between threads safely"]
-pub unsafe trait Sync : MarkerTrait {
+pub unsafe trait Sync {
     // Empty
 }
 
+unsafe impl Sync for .. { }
+
 impl<T> !Sync for *const T { }
 impl<T> !Sync for *mut T { }
-impl !Sync for Managed { }
 
 /// A type which is considered "not POD", meaning that it is not
 /// implicitly copyable. This is typically embedded in other types to
 /// ensure that they are never copied, even if they lack a destructor.
 #[unstable(feature = "core",
            reason = "likely to change with new variance strategy")]
-#[lang="no_copy_bound"]
+#[lang = "no_copy_bound"]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoCopy;
-
-/// A type which is considered managed by the GC. This is typically
-/// embedded in other types.
-#[unstable(feature = "core",
-           reason = "likely to change with new variance strategy")]
-#[lang="managed_bound"]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Managed;
 
 macro_rules! impls{
     ($t: ident) => (
@@ -263,97 +268,60 @@ macro_rules! impls{
         )
 }
 
-/// `MarkerTrait` is intended to be used as the supertrait for traits
-/// that don't have any methods but instead serve just to designate
-/// categories of types. An example would be the `Send` trait, which
-/// indicates types that are sendable: `Send` does not itself offer
-/// any methods, but instead is used to gate access to data.
+/// `PhantomData<T>` allows you to describe that a type acts as if it stores a value of type `T`,
+/// even though it does not. This allows you to inform the compiler about certain safety properties
+/// of your code.
 ///
-/// FIXME. Better documentation needed here!
-pub trait MarkerTrait : PhantomFn<Self,Self> { }
-//                                    ~~~~~ <-- FIXME(#22806)?
-//
-// Marker trait has been made invariant so as to avoid inf recursion,
-// but we should ideally solve the underlying problem. That's a bit
-// complicated.
-
-impl<T:?Sized> MarkerTrait for T { }
-
-/// `PhantomFn` is a marker trait for use with traits that contain
-/// type or lifetime parameters that do not appear in any of their
-/// methods. In that case, you can either remove those parameters, or
-/// add a `PhantomFn` supertrait that reflects the signature of
-/// methods that compiler should "pretend" exists. This most commonly
-/// occurs for traits with no methods: in that particular case, you
-/// can extend `MarkerTrait`, which is equivalent to
-/// `PhantomFn<Self>`.
-///
-/// # Example
-///
-/// As an example, consider a trait with no methods like `Even`, meant
-/// to represent types that are "even":
-///
-/// ```rust,ignore
-/// trait Even { }
-/// ```
-///
-/// In this case, because the implicit parameter `Self` is unused, the
-/// compiler will issue an error. The only purpose of this trait is to
-/// categorize types (and hence instances of those types) as "even" or
-/// not, so if we *were* going to have a method, it might look like:
-///
-/// ```rust,ignore
-/// trait Even {
-///     fn is_even(self) -> bool { true }
-/// }
-/// ```
-///
-/// Therefore, we can model a method like this as follows:
-///
-/// ```rust
-/// use std::marker::PhantomFn;
-/// trait Even : PhantomFn<Self> { }
-/// ```
-///
-/// Another equivalent, but clearer, option would be to use
-/// `MarkerTrait`:
-///
-/// ```rust
-/// use std::marker::MarkerTrait;
-/// trait Even : MarkerTrait { }
-/// ```
-///
-/// # Parameters
-///
-/// - `A` represents the type of the method's argument. You can use a
-///   tuple to represent "multiple" arguments. Any types appearing here
-///   will be considered "contravariant".
-/// - `R`, if supplied, represents the method's return type. This defaults
-///   to `()` as it is rarely needed.
-///
-/// # Additional reading
-///
-/// More details and background can be found in [RFC 738][738].
-///
-/// [738]: https://github.com/rust-lang/rfcs/blob/master/text/0738-variance.md
-#[lang="phantom_fn"]
-#[stable(feature = "rust1", since = "1.0.0")]
-pub trait PhantomFn<A:?Sized,R:?Sized=()> { }
-
-/// `PhantomData` is a way to tell the compiler about fake fields.
-/// Phantom data is required whenever type parameters are not used.
-/// The idea is that if the compiler encounters a `PhantomData<T>`
-/// instance, it will behave *as if* an instance of the type `T` were
-/// present for the purpose of various automatic analyses.
+/// Though they both have scary names, `PhantomData<T>` and "phantom types" are unrelated. 👻👻👻
 ///
 /// # Examples
 ///
-/// When handling external resources over a foreign function interface, `PhantomData<T>` can
-/// prevent mismatches by enforcing types in the method implementations, although the struct
-/// doesn't actually contain values of the resource type.
+/// ## Unused lifetime parameter
+///
+/// Perhaps the most common time that `PhantomData` is required is
+/// with a struct that has an unused lifetime parameter, typically as
+/// part of some unsafe code. For example, here is a struct `Slice`
+/// that has two pointers of type `*const T`, presumably pointing into
+/// an array somewhere:
+///
+/// ```ignore
+/// struct Slice<'a, T> {
+///     start: *const T,
+///     end: *const T,
+/// }
+/// ```
+///
+/// The intention is that the underlying data is only valid for the
+/// lifetime `'a`, so `Slice` should not outlive `'a`. However, this
+/// intent is not expressed in the code, since there are no uses of
+/// the lifetime `'a` and hence it is not clear what data it applies
+/// to. We can correct this by telling the compiler to act *as if* the
+/// `Slice` struct contained a borrowed reference `&'a T`:
 ///
 /// ```
-/// # trait ResType { fn foo(&self); };
+/// use std::marker::PhantomData;
+///
+/// struct Slice<'a, T:'a> {
+///     start: *const T,
+///     end: *const T,
+///     phantom: PhantomData<&'a T>
+/// }
+/// ```
+///
+/// This also in turn requires that we annotate `T:'a`, indicating
+/// that `T` is a type that can be borrowed for the lifetime `'a`.
+///
+/// ## Unused type parameters
+///
+/// It sometimes happens that there are unused type parameters that
+/// indicate what type of data a struct is "tied" to, even though that
+/// data is not actually found in the struct itself. Here is an
+/// example where this arises when handling external resources over a
+/// foreign function interface. `PhantomData<T>` can prevent
+/// mismatches by enforcing types in the method implementations:
+///
+/// ```
+/// # trait ResType { fn foo(&self); }
 /// # struct ParamType;
 /// # mod foreign_lib {
 /// # pub fn new(_: usize) -> *mut () { 42 as *mut () }
@@ -384,19 +352,22 @@ pub trait PhantomFn<A:?Sized,R:?Sized=()> { }
 /// }
 /// ```
 ///
-/// Another example: embedding a `PhantomData<T>` will inform the compiler
-/// that one or more instances of the type `T` could be dropped when
-/// instances of the type itself is dropped, though that may not be
-/// apparent from the other structure of the type itself. This is
-/// commonly necessary if the structure is using an unsafe pointer
-/// like `*mut T` whose referent may be dropped when the type is
-/// dropped, as a `*mut T` is otherwise not treated as owned.
+/// ## Indicating ownership
 ///
-/// FIXME. Better documentation and examples of common patterns needed
-/// here! For now, please see [RFC 738][738] for more information.
+/// Adding a field of type `PhantomData<T>` also indicates that your
+/// struct owns data of type `T`. This in turn implies that when your
+/// struct is dropped, it may in turn drop one or more instances of
+/// the type `T`, though that may not be apparent from the other
+/// structure of the type itself. This is commonly necessary if the
+/// structure is using an unsafe pointer like `*mut T` whose referent
+/// may be dropped when the type is dropped, as a `*mut T` is
+/// otherwise not treated as owned.
 ///
-/// [738]: https://github.com/rust-lang/rfcs/blob/master/text/0738-variance.md
-#[lang="phantom_data"]
+/// If your struct does not in fact *own* the data of type `T`, it is
+/// better to use a reference type, like `PhantomData<&'a T>`
+/// (ideally) or `PhantomData<*const T>` (if no lifetime applies), so
+/// as not to indicate ownership.
+#[lang = "phantom_data"]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct PhantomData<T:?Sized>;
 
@@ -409,38 +380,42 @@ mod impls {
     unsafe impl<'a, T: Send + ?Sized> Send for &'a mut T {}
 }
 
-/// Old-style marker trait. Deprecated.
-#[unstable(feature = "core", reason = "deprecated")]
-#[deprecated(since = "1.0.0", reason = "Replace with `PhantomData<&'a ()>`")]
-#[lang="contravariant_lifetime"]
-pub struct ContravariantLifetime<'a>;
+/// A marker trait indicates a type that can be reflected over. This
+/// trait is implemented for all types. Its purpose is to ensure that
+/// when you write a generic function that will employ reflection,
+/// that must be reflected (no pun intended) in the generic bounds of
+/// that function. Here is an example:
+///
+/// ```
+/// #![feature(core)]
+/// use std::marker::Reflect;
+/// use std::any::Any;
+/// fn foo<T:Reflect+'static>(x: &T) {
+///     let any: &Any = x;
+///     if any.is::<u32>() { println!("u32"); }
+/// }
+/// ```
+///
+/// Without the declaration `T:Reflect`, `foo` would not type check
+/// (note: as a matter of style, it would be preferable to to write
+/// `T:Any`, because `T:Any` implies `T:Reflect` and `T:'static`, but
+/// we use `Reflect` here to show how it works). The `Reflect` bound
+/// thus serves to alert `foo`'s caller to the fact that `foo` may
+/// behave differently depending on whether `T=u32` or not. In
+/// particular, thanks to the `Reflect` bound, callers know that a
+/// function declared like `fn bar<T>(...)` will always act in
+/// precisely the same way no matter what type `T` is supplied,
+/// because there are no bounds declared on `T`. (The ability for a
+/// caller to reason about what a function may do based solely on what
+/// generic bounds are declared is often called the ["parametricity
+/// property"][1].)
+///
+/// [1]: http://en.wikipedia.org/wiki/Parametricity
+#[rustc_reflect_like]
+#[unstable(feature = "core", reason = "requires RFC and more experience")]
+#[allow(deprecated)]
+#[rustc_on_unimplemented = "`{Self}` does not implement `Any`; \
+                            ensure all type parameters are bounded by `Any`"]
+pub trait Reflect {}
 
-/// Old-style marker trait. Deprecated.
-#[unstable(feature = "core", reason = "deprecated")]
-#[deprecated(since = "1.0.0", reason = "Replace with `PhantomData<fn(&'a ())>`")]
-#[lang="covariant_lifetime"]
-pub struct CovariantLifetime<'a>;
-
-/// Old-style marker trait. Deprecated.
-#[unstable(feature = "core", reason = "deprecated")]
-#[deprecated(since = "1.0.0", reason = "Replace with `PhantomData<Cell<&'a ()>>`")]
-#[lang="invariant_lifetime"]
-pub struct InvariantLifetime<'a>;
-
-/// Old-style marker trait. Deprecated.
-#[unstable(feature = "core", reason = "deprecated")]
-#[deprecated(since = "1.0.0", reason = "Replace with `PhantomData<fn(T)>`")]
-#[lang="contravariant_type"]
-pub struct ContravariantType<T>;
-
-/// Old-style marker trait. Deprecated.
-#[unstable(feature = "core", reason = "deprecated")]
-#[deprecated(since = "1.0.0", reason = "Replace with `PhantomData<T>`")]
-#[lang="covariant_type"]
-pub struct CovariantType<T>;
-
-/// Old-style marker trait. Deprecated.
-#[unstable(feature = "core", reason = "deprecated")]
-#[deprecated(since = "1.0.0", reason = "Replace with `PhantomData<Cell<T>>`")]
-#[lang="invariant_type"]
-pub struct InvariantType<T>;
+impl Reflect for .. { }

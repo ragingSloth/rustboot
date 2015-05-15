@@ -1,18 +1,21 @@
-global _gdt_flush
-global _gdtr
+gdtr:
+    dw (gdt_end - gdt) + 1
+    dd gdt
 
-_gdt_flush:
-    lgdt [_gdtr]
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov ss, ax
-    jmp 0x08:flush2
-flush2:
-    ret
-
-_gdtr:
-    dw 0
-    dd 0
+gdt:
+    dq 0
+   ;CS 
+    dw 0xffff       ; limit 0:15
+    dw 0x0000       ; base 0:15
+    db 0x00         ; base 16:23
+    db 0b10011010   ; access byte - code
+    db 0x4f         ; flags/(limit 16:19). flag is set to 32 bit protected mode
+    db 0x00         ; base 24:31
+    ;DS
+    dw 0xffff       ; limit 0:15
+    dw 0x0000       ; base 0:15
+    db 0x00         ; base 16:23
+    db 0b10010010   ; access byte - data
+    db 0x4f         ; flags/(limit 16:19). flag is set to 32 bit protected mode
+    db 0x00         ; base 24:31
+gdt_end:

@@ -14,11 +14,27 @@
 
 #![allow(unsigned_negation)]
 
+use prelude::*;
+
 use fmt;
-use iter::IteratorExt;
-use num::{Int, cast};
-use slice::SliceExt;
+use num::Zero;
+use ops::{Div, Rem, Sub};
 use str;
+
+#[doc(hidden)]
+trait Int: Zero + PartialEq + PartialOrd + Div<Output=Self> + Rem<Output=Self> +
+           Sub<Output=Self> + Copy {
+    fn from_u8(u: u8) -> Self;
+    fn to_u8(&self) -> u8;
+}
+
+macro_rules! doit {
+    ($($t:ident)*) => ($(impl Int for $t {
+        fn from_u8(u: u8) -> $t { u as $t }
+        fn to_u8(&self) -> u8 { *self as u8 }
+    })*)
+}
+doit! { i8 i16 i32 i64 isize u8 u16 u32 u64 usize }
 
 /// A type that represents a specific radix
 #[doc(hidden)]
@@ -36,29 +52,29 @@ trait GenericRadix {
     fn fmt_int<T: Int>(&self, mut x: T, f: &mut fmt::Formatter) -> fmt::Result {
         // The radix can be as low as 2, so we need a buffer of at least 64
         // characters for a base 2 number.
-        let zero = Int::zero();
+        let zero = T::zero();
         let is_positive = x >= zero;
         let mut buf = [0; 64];
         let mut curr = buf.len();
-        let base = cast(self.base()).unwrap();
+        let base = T::from_u8(self.base());
         if is_positive {
             // Accumulate each digit of the number from the least significant
             // to the most significant figure.
             for byte in buf.iter_mut().rev() {
-                let n = x % base;                         // Get the current place value.
-                x = x / base;                             // Deaccumulate the number.
-                *byte = self.digit(cast(n).unwrap());     // Store the digit in the buffer.
+                let n = x % base;              // Get the current place value.
+                x = x / base;                  // Deaccumulate the number.
+                *byte = self.digit(n.to_u8()); // Store the digit in the buffer.
                 curr -= 1;
-                if x == zero { break };                   // No more digits left to accumulate.
+                if x == zero { break };        // No more digits left to accumulate.
             }
         } else {
             // Do the same as above, but accounting for two's complement.
             for byte in buf.iter_mut().rev() {
-                let n = zero - (x % base);                // Get the current place value.
-                x = x / base;                             // Deaccumulate the number.
-                *byte = self.digit(cast(n).unwrap());     // Store the digit in the buffer.
+                let n = zero - (x % base);     // Get the current place value.
+                x = x / base;                  // Deaccumulate the number.
+                *byte = self.digit(n.to_u8()); // Store the digit in the buffer.
                 curr -= 1;
-                if x == zero { break };                   // No more digits left to accumulate.
+                if x == zero { break };        // No more digits left to accumulate.
             }
         }
         let buf = unsafe { str::from_utf8_unchecked(&buf[curr..]) };
@@ -138,14 +154,15 @@ impl GenericRadix for Radix {
 /// A helper type for formatting radixes.
 #[unstable(feature = "core",
            reason = "may be renamed or move to a different module")]
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 pub struct RadixFmt<T, R>(T, R);
 
 /// Constructs a radix formatter in the range of `2..36`.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
+/// # #![feature(core)]
 /// use std::fmt::radix;
 /// assert_eq!(format!("{}", radix(55, 36)), "1j".to_string());
 /// ```

@@ -38,7 +38,7 @@
 //!   provided by the [rlibc crate](https://crates.io/crates/rlibc).
 //!
 //! * `rust_begin_unwind` - This function takes three arguments, a
-//!   `fmt::Arguments`, a `&str`, and a `usize`. These three arguments dictate
+//!   `fmt::Arguments`, a `&str`, and a `u32`. These three arguments dictate
 //!   the panic message, the file at which panic was invoked, and the line.
 //!   It is up to consumers of this core library to define this panic
 //!   function; it is only required to never return.
@@ -56,21 +56,24 @@
        html_favicon_url = "http://www.rust-lang.org/favicon.ico",
        html_root_url = "http://doc.rust-lang.org/nightly/",
        html_playground_url = "http://play.rust-lang.org/")]
+#![doc(test(no_crate_inject))]
 
 #![feature(no_std)]
 #![no_std]
 #![allow(raw_pointer_derive)]
 #![deny(missing_docs)]
 
-#![feature(int_uint)]
 #![feature(intrinsics, lang_items)]
 #![feature(on_unimplemented)]
-#![feature(simd, unsafe_destructor)]
+#![feature(simd)]
 #![feature(staged_api)]
 #![feature(unboxed_closures)]
 #![feature(rustc_attrs)]
 #![feature(optin_builtin_traits)]
+#![feature(fundamental)]
 #![feature(concat_idents)]
+#![feature(reflect)]
+#![feature(custom_attribute)]
 
 #[macro_use]
 mod macros;
@@ -105,6 +108,7 @@ mod uint_macros;
 #[path = "num/f32.rs"]   pub mod f32;
 #[path = "num/f64.rs"]   pub mod f64;
 
+#[macro_use]
 pub mod num;
 
 /* The libcore prelude, not as all-encompassing as the libstd prelude */
@@ -125,15 +129,16 @@ pub mod ops;
 pub mod cmp;
 pub mod clone;
 pub mod default;
+pub mod convert;
 
 /* Core types and methods on primitives */
 
 pub mod any;
+pub mod array;
 pub mod atomic;
 pub mod cell;
 pub mod char;
 pub mod panicking;
-pub mod finally;
 pub mod iter;
 pub mod option;
 pub mod raw;
@@ -143,7 +148,6 @@ pub mod slice;
 pub mod str;
 pub mod hash;
 pub mod fmt;
-pub mod error;
 
 #[doc(primitive = "bool")]
 mod bool {
@@ -151,10 +155,10 @@ mod bool {
 
 // note: does not need to be public
 mod tuple;
-mod array;
 
 #[doc(hidden)]
 mod core {
+    pub use intrinsics;
     pub use panicking;
     pub use fmt;
     pub use clone;

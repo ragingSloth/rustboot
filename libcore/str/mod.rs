@@ -7,8 +7,6 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-//
-// ignore-lexer-test FIXME #15679
 
 //! String manipulation
 //!
@@ -17,102 +15,26 @@
 #![doc(primitive = "str")]
 
 use self::OldSearcher::{TwoWay, TwoWayLong};
+use self::pattern::Pattern;
+use self::pattern::{Searcher, ReverseSearcher, DoubleEndedSearcher};
 
+use char::CharExt;
 use clone::Clone;
 use cmp::{self, Eq};
+use convert::AsRef;
 use default::Default;
-use error::Error;
 use fmt;
 use iter::ExactSizeIterator;
-use iter::{Map, Iterator, IteratorExt, DoubleEndedIterator};
-use marker::Sized;
+use iter::{Map, Iterator, DoubleEndedIterator};
 use mem;
-use num::Int;
-use ops::{Fn, FnMut};
+use ops::{Fn, FnMut, FnOnce};
 use option::Option::{self, None, Some};
-use ptr::PtrExt;
 use raw::{Repr, Slice};
 use result::Result::{self, Ok, Err};
 use slice::{self, SliceExt};
 use usize;
 
-pub use self::pattern::Pattern;
-pub use self::pattern::{Searcher, ReverseSearcher, DoubleEndedSearcher, SearchStep};
-
-mod pattern;
-
-macro_rules! delegate_iter {
-    (exact $te:ty : $ti:ty) => {
-        delegate_iter!{$te : $ti}
-        impl<'a> ExactSizeIterator for $ti {
-            #[inline]
-            fn len(&self) -> usize {
-                self.0.len()
-            }
-        }
-    };
-    ($te:ty : $ti:ty) => {
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a> Iterator for $ti {
-            type Item = $te;
-
-            #[inline]
-            fn next(&mut self) -> Option<$te> {
-                self.0.next()
-            }
-            #[inline]
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                self.0.size_hint()
-            }
-        }
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a> DoubleEndedIterator for $ti {
-            #[inline]
-            fn next_back(&mut self) -> Option<$te> {
-                self.0.next_back()
-            }
-        }
-    };
-    (pattern $te:ty : $ti:ty) => {
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a, P: Pattern<'a>> Iterator for $ti {
-            type Item = $te;
-
-            #[inline]
-            fn next(&mut self) -> Option<$te> {
-                self.0.next()
-            }
-            #[inline]
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                self.0.size_hint()
-            }
-        }
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a, P: Pattern<'a>> DoubleEndedIterator for $ti
-        where P::Searcher: DoubleEndedSearcher<'a> {
-            #[inline]
-            fn next_back(&mut self) -> Option<$te> {
-                self.0.next_back()
-            }
-        }
-    };
-    (pattern forward $te:ty : $ti:ty) => {
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a, P: Pattern<'a>> Iterator for $ti
-        where P::Searcher: DoubleEndedSearcher<'a> {
-            type Item = $te;
-
-            #[inline]
-            fn next(&mut self) -> Option<$te> {
-                self.0.next()
-            }
-            #[inline]
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                self.0.size_hint()
-            }
-        }
-    }
-}
+pub mod pattern;
 
 /// A trait to abstract the idea of creating a new instance of a type from a
 /// string.
@@ -122,8 +44,11 @@ pub trait FromStr {
     #[stable(feature = "rust1", since = "1.0.0")]
     type Err;
 
-    /// Parses a string `s` to return an optional value of this type. If the
-    /// string is ill-formatted, the None is returned.
+    /// Parses a string `s` to return a value of this type.
+    ///
+    /// If parsing succeeds, return the value inside `Ok`, otherwise
+    /// when the string is ill-formatted return an error specific to the
+    /// inside `Err`. The error type is specific to implementation of the trait.
     #[stable(feature = "rust1", since = "1.0.0")]
     fn from_str(s: &str) -> Result<Self, Self::Err>;
 }
@@ -139,7 +64,7 @@ impl FromStr for bool {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use std::str::FromStr;
     ///
     /// assert_eq!(FromStr::from_str("true"), Ok(true));
@@ -147,10 +72,9 @@ impl FromStr for bool {
     /// assert!(<bool as FromStr>::from_str("not even a boolean").is_err());
     /// ```
     ///
-    /// Note, in many cases, the StrExt::parse() which is based on
-    /// this FromStr::from_str() is more proper.
+    /// Note, in many cases, the `.parse()` method on `str` is more proper.
     ///
-    /// ```rust
+    /// ```
     /// assert_eq!("true".parse(), Ok(true));
     /// assert_eq!("false".parse(), Ok(false));
     /// assert!("not even a boolean".parse::<bool>().is_err());
@@ -177,30 +101,25 @@ impl fmt::Display for ParseBoolError {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
-impl Error for ParseBoolError {
-    fn description(&self) -> &str { "failed to parse bool" }
-}
-
 /*
 Section: Creating a string
 */
 
 /// Errors which can occur when attempting to interpret a byte slice as a `str`.
 #[derive(Copy, Eq, PartialEq, Clone, Debug)]
-#[unstable(feature = "core",
-           reason = "error enumeration recently added and definitions may be refined")]
-pub enum Utf8Error {
-    /// An invalid byte was detected at the byte offset given.
-    ///
-    /// The offset is guaranteed to be in bounds of the slice in question, and
-    /// the byte at the specified offset was the first invalid byte in the
-    /// sequence detected.
-    InvalidByte(usize),
+#[stable(feature = "rust1", since = "1.0.0")]
+pub struct Utf8Error {
+    valid_up_to: usize,
+}
 
-    /// The byte slice was invalid because more bytes were needed but no more
-    /// bytes were available.
-    TooShort,
+impl Utf8Error {
+    /// Returns the index in the given string up to which valid UTF-8 was
+    /// verified.
+    ///
+    /// Starting at the index provided, but not necessarily at it precisely, an
+    /// invalid UTF-8 encoding sequence was found.
+    #[unstable(feature = "utf8_error", reason = "method just added")]
+    pub fn valid_up_to(&self) -> usize { self.valid_up_to }
 }
 
 /// Converts a slice of bytes to a string slice without performing any
@@ -221,104 +140,16 @@ pub fn from_utf8(v: &[u8]) -> Result<&str, Utf8Error> {
 
 /// Converts a slice of bytes to a string slice without checking
 /// that the string contains valid UTF-8.
+#[inline(always)]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub unsafe fn from_utf8_unchecked<'a>(v: &'a [u8]) -> &'a str {
     mem::transmute(v)
 }
 
-/// Constructs a static string slice from a given raw pointer.
-///
-/// This function will read memory starting at `s` until it finds a 0, and then
-/// transmute the memory up to that point as a string slice, returning the
-/// corresponding `&'static str` value.
-///
-/// This function is unsafe because the caller must ensure the C string itself
-/// has the static lifetime and that the memory `s` is valid up to and including
-/// the first null byte.
-///
-/// # Panics
-///
-/// This function will panic if the string pointed to by `s` is not valid UTF-8.
-#[unstable(feature = "core")]
-#[deprecated(since = "1.0.0",
-             reason = "use std::ffi::c_str_to_bytes + str::from_utf8")]
-pub unsafe fn from_c_str(s: *const i8) -> &'static str {
-    let s = s as *const u8;
-    let mut len = 0;
-    while *s.offset(len as isize) != 0 {
-        len += 1;
-    }
-    let v: &'static [u8] = ::mem::transmute(Slice { data: s, len: len });
-    from_utf8(v).ok().expect("from_c_str passed invalid utf-8 data")
-}
-
-/// Something that can be used to compare against a character
-#[unstable(feature = "core")]
-#[deprecated(since = "1.0.0",
-             reason = "use `Pattern` instead")]
-// NB: Rather than removing it, make it private and move it into self::pattern
-pub trait CharEq {
-    /// Determine if the splitter should split at the given character
-    fn matches(&mut self, char) -> bool;
-    /// Indicate if this is only concerned about ASCII characters,
-    /// which can allow for a faster implementation.
-    fn only_ascii(&self) -> bool;
-}
-
-#[allow(deprecated) /* for CharEq */ ]
-impl CharEq for char {
-    #[inline]
-    fn matches(&mut self, c: char) -> bool { *self == c }
-
-    #[inline]
-    fn only_ascii(&self) -> bool { (*self as u32) < 128 }
-}
-
-#[allow(deprecated) /* for CharEq */ ]
-impl<F> CharEq for F where F: FnMut(char) -> bool {
-    #[inline]
-    fn matches(&mut self, c: char) -> bool { (*self)(c) }
-
-    #[inline]
-    fn only_ascii(&self) -> bool { false }
-}
-
-#[allow(deprecated) /* for CharEq */ ]
-impl<'a> CharEq for &'a [char] {
-    #[inline]
-    #[allow(deprecated) /* for CharEq */ ]
-    fn matches(&mut self, c: char) -> bool {
-        self.iter().any(|&m| { let mut m = m; m.matches(c) })
-    }
-
-    #[inline]
-    #[allow(deprecated) /* for CharEq */ ]
-    fn only_ascii(&self) -> bool {
-        self.iter().all(|m| m.only_ascii())
-    }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
-impl Error for Utf8Error {
-    fn description(&self) -> &str {
-        match *self {
-            Utf8Error::TooShort => "invalid utf-8: not enough bytes",
-            Utf8Error::InvalidByte(..) => "invalid utf-8: corrupt contents",
-        }
-    }
-}
-
 #[stable(feature = "rust1", since = "1.0.0")]
 impl fmt::Display for Utf8Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Utf8Error::InvalidByte(n) => {
-                write!(f, "invalid utf-8: invalid byte at index {}", n)
-            }
-            Utf8Error::TooShort => {
-                write!(f, "invalid utf-8: byte slice too short")
-            }
-        }
+        write!(f, "invalid utf-8: invalid byte near index {}", self.valid_up_to)
     }
 }
 
@@ -335,21 +166,20 @@ pub struct Chars<'a> {
     iter: slice::Iter<'a, u8>
 }
 
-// Return the initial codepoint accumulator for the first byte.
-// The first byte is special, only want bottom 5 bits for width 2, 4 bits
-// for width 3, and 3 bits for width 4
-macro_rules! utf8_first_byte {
-    ($byte:expr, $width:expr) => (($byte & (0x7F >> $width)) as u32)
-}
+/// Return the initial codepoint accumulator for the first byte.
+/// The first byte is special, only want bottom 5 bits for width 2, 4 bits
+/// for width 3, and 3 bits for width 4.
+#[inline]
+fn utf8_first_byte(byte: u8, width: u32) -> u32 { (byte & (0x7F >> width)) as u32 }
 
-// return the value of $ch updated with continuation byte $byte
-macro_rules! utf8_acc_cont_byte {
-    ($ch:expr, $byte:expr) => (($ch << 6) | ($byte & CONT_MASK) as u32)
-}
+/// Return the value of `ch` updated with continuation byte `byte`.
+#[inline]
+fn utf8_acc_cont_byte(ch: u32, byte: u8) -> u32 { (ch << 6) | (byte & CONT_MASK) as u32 }
 
-macro_rules! utf8_is_cont_byte {
-    ($byte:expr) => (($byte & !CONT_MASK) == TAG_CONT_U8)
-}
+/// Checks whether the byte is a UTF-8 continuation byte (i.e. starts with the
+/// bits `10`).
+#[inline]
+fn utf8_is_cont_byte(byte: u8) -> bool { (byte & !CONT_MASK) == TAG_CONT_U8 }
 
 #[inline]
 fn unwrap_or_0(opt: Option<&u8>) -> u8 {
@@ -374,20 +204,20 @@ pub fn next_code_point(bytes: &mut slice::Iter<u8>) -> Option<u32> {
     // Multibyte case follows
     // Decode from a byte combination out of: [[[x y] z] w]
     // NOTE: Performance is sensitive to the exact formulation here
-    let init = utf8_first_byte!(x, 2);
+    let init = utf8_first_byte(x, 2);
     let y = unwrap_or_0(bytes.next());
-    let mut ch = utf8_acc_cont_byte!(init, y);
+    let mut ch = utf8_acc_cont_byte(init, y);
     if x >= 0xE0 {
         // [[x y z] w] case
         // 5th bit in 0xE0 .. 0xEF is always clear, so `init` is still valid
         let z = unwrap_or_0(bytes.next());
-        let y_z = utf8_acc_cont_byte!((y & CONT_MASK) as u32, z);
+        let y_z = utf8_acc_cont_byte((y & CONT_MASK) as u32, z);
         ch = init << 12 | y_z;
         if x >= 0xF0 {
             // [x y z w] case
             // use only the lower 3 bits of `init`
             let w = unwrap_or_0(bytes.next());
-            ch = (init & 7) << 18 | utf8_acc_cont_byte!(y_z, w);
+            ch = (init & 7) << 18 | utf8_acc_cont_byte(y_z, w);
         }
     }
 
@@ -410,18 +240,18 @@ pub fn next_code_point_reverse(bytes: &mut slice::Iter<u8>) -> Option<u32> {
     // Decode from a byte combination out of: [x [y [z w]]]
     let mut ch;
     let z = unwrap_or_0(bytes.next_back());
-    ch = utf8_first_byte!(z, 2);
-    if utf8_is_cont_byte!(z) {
+    ch = utf8_first_byte(z, 2);
+    if utf8_is_cont_byte(z) {
         let y = unwrap_or_0(bytes.next_back());
-        ch = utf8_first_byte!(y, 3);
-        if utf8_is_cont_byte!(y) {
+        ch = utf8_first_byte(y, 3);
+        if utf8_is_cont_byte(y) {
             let x = unwrap_or_0(bytes.next_back());
-            ch = utf8_first_byte!(x, 4);
-            ch = utf8_acc_cont_byte!(ch, y);
+            ch = utf8_first_byte(x, 4);
+            ch = utf8_acc_cont_byte(ch, y);
         }
-        ch = utf8_acc_cont_byte!(ch, z);
+        ch = utf8_acc_cont_byte(ch, z);
     }
-    ch = utf8_acc_cont_byte!(ch, w);
+    ch = utf8_acc_cont_byte(ch, w);
 
     Some(ch)
 }
@@ -443,7 +273,10 @@ impl<'a> Iterator for Chars<'a> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (len, _) = self.iter.size_hint();
-        (len.saturating_add(3) / 4, Some(len))
+        // `(len + 3)` can't overflow, because we know that the `slice::Iter`
+        // belongs to a slice in memory which has a maximum length of
+        // `isize::MAX` (that's well below `usize::MAX`).
+        ((len + 3) / 4, Some(len))
     }
 }
 
@@ -460,8 +293,7 @@ impl<'a> DoubleEndedIterator for Chars<'a> {
     }
 }
 
-/// External iterator for a string's characters and their byte offsets.
-/// Use with the `std::iter` module.
+/// Iterator for a string's characters and their byte offsets.
 #[derive(Clone)]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct CharIndices<'a> {
@@ -511,59 +343,242 @@ impl<'a> DoubleEndedIterator for CharIndices<'a> {
 /// External iterator for a string's bytes.
 /// Use with the `std::iter` module.
 ///
-/// Created with `StrExt::bytes`
+/// Created with the method `.bytes()`.
 #[stable(feature = "rust1", since = "1.0.0")]
 #[derive(Clone)]
 pub struct Bytes<'a>(Map<slice::Iter<'a, u8>, BytesDeref>);
-delegate_iter!{exact u8 : Bytes<'a>}
 
-/// A temporary fn new type that ensures that the `Bytes` iterator
-/// is cloneable.
-#[derive(Copy, Clone)]
+/// A nameable, clonable fn type
+#[derive(Clone)]
 struct BytesDeref;
 
 impl<'a> Fn<(&'a u8,)> for BytesDeref {
-    type Output = u8;
-
     #[inline]
     extern "rust-call" fn call(&self, (ptr,): (&'a u8,)) -> u8 {
         *ptr
     }
 }
 
-/// An iterator over the substrings of a string, separated by `sep`.
-struct CharSplits<'a, P: Pattern<'a>> {
-    /// The slice remaining to be iterated
+impl<'a> FnMut<(&'a u8,)> for BytesDeref {
+    #[inline]
+    extern "rust-call" fn call_mut(&mut self, (ptr,): (&'a u8,)) -> u8 {
+        Fn::call(&*self, (ptr,))
+    }
+}
+
+impl<'a> FnOnce<(&'a u8,)> for BytesDeref {
+    type Output = u8;
+
+    #[inline]
+    extern "rust-call" fn call_once(self, (ptr,): (&'a u8,)) -> u8 {
+        Fn::call(&self, (ptr,))
+    }
+}
+
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<'a> Iterator for Bytes<'a> {
+    type Item = u8;
+
+    #[inline]
+    fn next(&mut self) -> Option<u8> {
+        self.0.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<'a> DoubleEndedIterator for Bytes<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<u8> {
+        self.0.next_back()
+    }
+}
+
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<'a> ExactSizeIterator for Bytes<'a> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+/// This macro generates a Clone impl for string pattern API
+/// wrapper types of the form X<'a, P>
+macro_rules! derive_pattern_clone {
+    (clone $t:ident with |$s:ident| $e:expr) => {
+        impl<'a, P: Pattern<'a>> Clone for $t<'a, P>
+            where P::Searcher: Clone
+        {
+            fn clone(&self) -> Self {
+                let $s = self;
+                $e
+            }
+        }
+    }
+}
+
+/// This macro generates two public iterator structs
+/// wrapping an private internal one that makes use of the `Pattern` API.
+///
+/// For all patterns `P: Pattern<'a>` the following items will be
+/// generated (generics omitted):
+///
+/// struct $forward_iterator($internal_iterator);
+/// struct $reverse_iterator($internal_iterator);
+///
+/// impl Iterator for $forward_iterator
+/// { /* internal ends up calling Searcher::next_match() */ }
+///
+/// impl DoubleEndedIterator for $forward_iterator
+///       where P::Searcher: DoubleEndedSearcher
+/// { /* internal ends up calling Searcher::next_match_back() */ }
+///
+/// impl Iterator for $reverse_iterator
+///       where P::Searcher: ReverseSearcher
+/// { /* internal ends up calling Searcher::next_match_back() */ }
+///
+/// impl DoubleEndedIterator for $reverse_iterator
+///       where P::Searcher: DoubleEndedSearcher
+/// { /* internal ends up calling Searcher::next_match() */ }
+///
+/// The internal one is defined outside the macro, and has almost the same
+/// semantic as a DoubleEndedIterator by delegating to `pattern::Searcher` and
+/// `pattern::ReverseSearcher` for both forward and reverse iteration.
+///
+/// "Almost", because a `Searcher` and a `ReverseSearcher` for a given
+/// `Pattern` might not return the same elements, so actually implementing
+/// `DoubleEndedIterator` for it would be incorrect.
+/// (See the docs in `str::pattern` for more details)
+///
+/// However, the internal struct still represents a single ended iterator from
+/// either end, and depending on pattern is also a valid double ended iterator,
+/// so the two wrapper structs implement `Iterator`
+/// and `DoubleEndedIterator` depending on the concrete pattern type, leading
+/// to the complex impls seen above.
+macro_rules! generate_pattern_iterators {
+    {
+        // Forward iterator
+        forward:
+            $(#[$forward_iterator_attribute:meta])*
+            struct $forward_iterator:ident;
+
+        // Reverse iterator
+        reverse:
+            $(#[$reverse_iterator_attribute:meta])*
+            struct $reverse_iterator:ident;
+
+        // Stability of all generated items
+        stability:
+            $(#[$common_stability_attribute:meta])*
+
+        // Internal almost-iterator that is being delegated to
+        internal:
+            $internal_iterator:ident yielding ($iterty:ty);
+
+        // Kind of delgation - either single ended or double ended
+        delegate $($t:tt)*
+    } => {
+        $(#[$forward_iterator_attribute])*
+        $(#[$common_stability_attribute])*
+        pub struct $forward_iterator<'a, P: Pattern<'a>>($internal_iterator<'a, P>);
+
+        $(#[$common_stability_attribute])*
+        impl<'a, P: Pattern<'a>> Iterator for $forward_iterator<'a, P> {
+            type Item = $iterty;
+
+            #[inline]
+            fn next(&mut self) -> Option<$iterty> {
+                self.0.next()
+            }
+        }
+
+        $(#[$common_stability_attribute])*
+        impl<'a, P: Pattern<'a>> Clone for $forward_iterator<'a, P>
+            where P::Searcher: Clone
+        {
+            fn clone(&self) -> Self {
+                $forward_iterator(self.0.clone())
+            }
+        }
+
+        $(#[$reverse_iterator_attribute])*
+        $(#[$common_stability_attribute])*
+        pub struct $reverse_iterator<'a, P: Pattern<'a>>($internal_iterator<'a, P>);
+
+        $(#[$common_stability_attribute])*
+        impl<'a, P: Pattern<'a>> Iterator for $reverse_iterator<'a, P>
+            where P::Searcher: ReverseSearcher<'a>
+        {
+            type Item = $iterty;
+
+            #[inline]
+            fn next(&mut self) -> Option<$iterty> {
+                self.0.next_back()
+            }
+        }
+
+        $(#[$common_stability_attribute])*
+        impl<'a, P: Pattern<'a>> Clone for $reverse_iterator<'a, P>
+            where P::Searcher: Clone
+        {
+            fn clone(&self) -> Self {
+                $reverse_iterator(self.0.clone())
+            }
+        }
+
+        generate_pattern_iterators!($($t)* with $(#[$common_stability_attribute])*,
+                                                $forward_iterator,
+                                                $reverse_iterator, $iterty);
+    };
+    {
+        double ended; with $(#[$common_stability_attribute:meta])*,
+                           $forward_iterator:ident,
+                           $reverse_iterator:ident, $iterty:ty
+    } => {
+        $(#[$common_stability_attribute])*
+        impl<'a, P: Pattern<'a>> DoubleEndedIterator for $forward_iterator<'a, P>
+            where P::Searcher: DoubleEndedSearcher<'a>
+        {
+            #[inline]
+            fn next_back(&mut self) -> Option<$iterty> {
+                self.0.next_back()
+            }
+        }
+
+        $(#[$common_stability_attribute])*
+        impl<'a, P: Pattern<'a>> DoubleEndedIterator for $reverse_iterator<'a, P>
+            where P::Searcher: DoubleEndedSearcher<'a>
+        {
+            #[inline]
+            fn next_back(&mut self) -> Option<$iterty> {
+                self.0.next()
+            }
+        }
+    };
+    {
+        single ended; with $(#[$common_stability_attribute:meta])*,
+                           $forward_iterator:ident,
+                           $reverse_iterator:ident, $iterty:ty
+    } => {}
+}
+
+derive_pattern_clone!{
+    clone SplitInternal
+    with |s| SplitInternal { matcher: s.matcher.clone(), ..*s }
+}
+struct SplitInternal<'a, P: Pattern<'a>> {
     start: usize,
     end: usize,
     matcher: P::Searcher,
-    /// Whether an empty string at the end is allowed
     allow_trailing_empty: bool,
     finished: bool,
 }
 
-/// An iterator over the substrings of a string, separated by `sep`,
-/// splitting at most `count` times.
-struct CharSplitsN<'a, P: Pattern<'a>> {
-    iter: CharSplits<'a, P>,
-    /// The number of splits remaining
-    count: usize,
-    invert: bool,
-}
-
-/// An iterator over the lines of a string, separated by `\n`.
-#[stable(feature = "rust1", since = "1.0.0")]
-pub struct Lines<'a> {
-    inner: CharSplits<'a, char>,
-}
-
-/// An iterator over the lines of a string, separated by either `\n` or (`\r\n`).
-#[stable(feature = "rust1", since = "1.0.0")]
-pub struct LinesAny<'a> {
-    inner: Map<Lines<'a>, fn(&str) -> &str>,
-}
-
-impl<'a, P: Pattern<'a>> CharSplits<'a, P> {
+impl<'a, P: Pattern<'a>> SplitInternal<'a, P> {
     #[inline]
     fn get_end(&mut self) -> Option<&'a str> {
         if !self.finished && (self.allow_trailing_empty || self.end - self.start > 0) {
@@ -576,11 +591,6 @@ impl<'a, P: Pattern<'a>> CharSplits<'a, P> {
             None
         }
     }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a, P: Pattern<'a>> Iterator for CharSplits<'a, P> {
-    type Item = &'a str;
 
     #[inline]
     fn next(&mut self) -> Option<&'a str> {
@@ -596,13 +606,11 @@ impl<'a, P: Pattern<'a>> Iterator for CharSplits<'a, P> {
             None => self.get_end(),
         }
     }
-}
 
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a, P: Pattern<'a>> DoubleEndedIterator for CharSplits<'a, P>
-where P::Searcher: DoubleEndedSearcher<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
+    fn next_back(&mut self) -> Option<&'a str>
+        where P::Searcher: ReverseSearcher<'a>
+    {
         if self.finished { return None }
 
         if !self.allow_trailing_empty {
@@ -628,19 +636,237 @@ where P::Searcher: DoubleEndedSearcher<'a> {
     }
 }
 
+generate_pattern_iterators! {
+    forward:
+        /// Created with the method `.split()`.
+        struct Split;
+    reverse:
+        /// Created with the method `.rsplit()`.
+        struct RSplit;
+    stability:
+        #[stable(feature = "rust1", since = "1.0.0")]
+    internal:
+        SplitInternal yielding (&'a str);
+    delegate double ended;
+}
+
+generate_pattern_iterators! {
+    forward:
+        /// Created with the method `.split_terminator()`.
+        struct SplitTerminator;
+    reverse:
+        /// Created with the method `.rsplit_terminator()`.
+        struct RSplitTerminator;
+    stability:
+        #[stable(feature = "rust1", since = "1.0.0")]
+    internal:
+        SplitInternal yielding (&'a str);
+    delegate double ended;
+}
+
+derive_pattern_clone!{
+    clone SplitNInternal
+    with |s| SplitNInternal { iter: s.iter.clone(), ..*s }
+}
+struct SplitNInternal<'a, P: Pattern<'a>> {
+    iter: SplitInternal<'a, P>,
+    /// The number of splits remaining
+    count: usize,
+}
+
+impl<'a, P: Pattern<'a>> SplitNInternal<'a, P> {
+    #[inline]
+    fn next(&mut self) -> Option<&'a str> {
+        match self.count {
+            0 => None,
+            1 => { self.count = 0; self.iter.get_end() }
+            _ => { self.count -= 1; self.iter.next() }
+        }
+    }
+
+    #[inline]
+    fn next_back(&mut self) -> Option<&'a str>
+        where P::Searcher: ReverseSearcher<'a>
+    {
+        match self.count {
+            0 => None,
+            1 => { self.count = 0; self.iter.get_end() }
+            _ => { self.count -= 1; self.iter.next_back() }
+        }
+    }
+}
+
+generate_pattern_iterators! {
+    forward:
+        /// Created with the method `.splitn()`.
+        struct SplitN;
+    reverse:
+        /// Created with the method `.rsplitn()`.
+        struct RSplitN;
+    stability:
+        #[stable(feature = "rust1", since = "1.0.0")]
+    internal:
+        SplitNInternal yielding (&'a str);
+    delegate single ended;
+}
+
+derive_pattern_clone!{
+    clone MatchIndicesInternal
+    with |s| MatchIndicesInternal(s.0.clone())
+}
+struct MatchIndicesInternal<'a, P: Pattern<'a>>(P::Searcher);
+
+impl<'a, P: Pattern<'a>> MatchIndicesInternal<'a, P> {
+    #[inline]
+    fn next(&mut self) -> Option<(usize, usize)> {
+        self.0.next_match()
+    }
+
+    #[inline]
+    fn next_back(&mut self) -> Option<(usize, usize)>
+        where P::Searcher: ReverseSearcher<'a>
+    {
+        self.0.next_match_back()
+    }
+}
+
+generate_pattern_iterators! {
+    forward:
+        /// Created with the method `.match_indices()`.
+        struct MatchIndices;
+    reverse:
+        /// Created with the method `.rmatch_indices()`.
+        struct RMatchIndices;
+    stability:
+        #[unstable(feature = "core",
+                   reason = "type may be removed or have its iterator impl changed")]
+    internal:
+        MatchIndicesInternal yielding ((usize, usize));
+    delegate double ended;
+}
+
+derive_pattern_clone!{
+    clone MatchesInternal
+    with |s| MatchesInternal(s.0.clone())
+}
+struct MatchesInternal<'a, P: Pattern<'a>>(P::Searcher);
+
+impl<'a, P: Pattern<'a>> MatchesInternal<'a, P> {
+    #[inline]
+    fn next(&mut self) -> Option<&'a str> {
+        self.0.next_match().map(|(a, b)| unsafe {
+            // Indices are known to be on utf8 boundaries
+            self.0.haystack().slice_unchecked(a, b)
+        })
+    }
+
+    #[inline]
+    fn next_back(&mut self) -> Option<&'a str>
+        where P::Searcher: ReverseSearcher<'a>
+    {
+        self.0.next_match_back().map(|(a, b)| unsafe {
+            // Indices are known to be on utf8 boundaries
+            self.0.haystack().slice_unchecked(a, b)
+        })
+    }
+}
+
+generate_pattern_iterators! {
+    forward:
+        /// Created with the method `.matches()`.
+        struct Matches;
+    reverse:
+        /// Created with the method `.rmatches()`.
+        struct RMatches;
+    stability:
+        #[unstable(feature = "core", reason = "type got recently added")]
+    internal:
+        MatchesInternal yielding (&'a str);
+    delegate double ended;
+}
+
+/// Created with the method `.lines()`.
 #[stable(feature = "rust1", since = "1.0.0")]
-impl<'a, P: Pattern<'a>> Iterator for CharSplitsN<'a, P>
-where P::Searcher: DoubleEndedSearcher<'a> {
+#[derive(Clone)]
+pub struct Lines<'a>(SplitTerminator<'a, char>);
+
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<'a> Iterator for Lines<'a> {
     type Item = &'a str;
 
     #[inline]
     fn next(&mut self) -> Option<&'a str> {
-        if self.count != 0 {
-            self.count -= 1;
-            if self.invert { self.iter.next_back() } else { self.iter.next() }
-        } else {
-            self.iter.get_end()
-        }
+        self.0.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<'a> DoubleEndedIterator for Lines<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<&'a str> {
+        self.0.next_back()
+    }
+}
+
+/// Created with the method `.lines_any()`.
+#[stable(feature = "rust1", since = "1.0.0")]
+#[derive(Clone)]
+pub struct LinesAny<'a>(Map<Lines<'a>, LinesAnyMap>);
+
+/// A nameable, clonable fn type
+#[derive(Clone)]
+struct LinesAnyMap;
+
+impl<'a> Fn<(&'a str,)> for LinesAnyMap {
+    #[inline]
+    extern "rust-call" fn call(&self, (line,): (&'a str,)) -> &'a str {
+        let l = line.len();
+        if l > 0 && line.as_bytes()[l - 1] == b'\r' { &line[0 .. l - 1] }
+        else { line }
+    }
+}
+
+impl<'a> FnMut<(&'a str,)> for LinesAnyMap {
+    #[inline]
+    extern "rust-call" fn call_mut(&mut self, (line,): (&'a str,)) -> &'a str {
+        Fn::call(&*self, (line,))
+    }
+}
+
+impl<'a> FnOnce<(&'a str,)> for LinesAnyMap {
+    type Output = &'a str;
+
+    #[inline]
+    extern "rust-call" fn call_once(self, (line,): (&'a str,)) -> &'a str {
+        Fn::call(&self, (line,))
+    }
+}
+
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<'a> Iterator for LinesAny<'a> {
+    type Item = &'a str;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a str> {
+        self.0.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<'a> DoubleEndedIterator for LinesAny<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<&'a str> {
+        self.0.next_back()
     }
 }
 
@@ -840,9 +1066,9 @@ impl TwoWaySearcher {
     // critical factorization (u, v) and p = period(v)
     #[inline]
     #[allow(dead_code)]
+    #[allow(deprecated)]
     fn maximal_suffix(arr: &[u8], reversed: bool) -> (usize, usize) {
-        use num::wrapping::WrappingOps;
-        let mut left = -1; // Corresponds to i in the paper
+        let mut left: usize = !0; // Corresponds to i in the paper
         let mut right = 0; // Corresponds to j in the paper
         let mut offset = 1; // Corresponds to k in the paper
         let mut period = 1; // Corresponds to p in the paper
@@ -895,7 +1121,7 @@ enum OldSearcher {
 impl OldSearcher {
     #[allow(dead_code)]
     fn new(haystack: &[u8], needle: &[u8]) -> OldSearcher {
-        if needle.len() == 0 {
+        if needle.is_empty() {
             // Handle specially
             unimplemented!()
         // FIXME: Tune this.
@@ -924,38 +1150,6 @@ struct OldMatchIndices<'a, 'b> {
     haystack: &'a str,
     needle: &'b str,
     searcher: OldSearcher
-}
-
-// FIXME: #21637 Prevents a Clone impl
-/// An iterator over the start and end indices of the matches of a
-/// substring within a larger string
-#[unstable(feature = "core", reason = "type may be removed")]
-pub struct MatchIndices<'a, P: Pattern<'a>>(P::Searcher);
-
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a, P: Pattern<'a>> Iterator for MatchIndices<'a, P> {
-    type Item = (usize, usize);
-
-    #[inline]
-    fn next(&mut self) -> Option<(usize, usize)> {
-        self.0.next_match()
-    }
-}
-
-/// An iterator over the substrings of a string separated by a given
-/// search string
-#[unstable(feature = "core")]
-#[deprecated(since = "1.0.0", reason = "use `Split` with a `&str`")]
-pub struct SplitStr<'a, P: Pattern<'a>>(Split<'a, P>);
-#[allow(deprecated)]
-impl<'a, P: Pattern<'a>> Iterator for SplitStr<'a, P> {
-    type Item = &'a str;
-
-    #[inline]
-    #[allow(deprecated)]
-    fn next(&mut self) -> Option<&'a str> {
-        Iterator::next(&mut self.0)
-    }
 }
 
 impl<'a, 'b>  OldMatchIndices<'a, 'b> {
@@ -994,7 +1188,7 @@ fn eq_slice_(a: &str, b: &str) -> bool {
 /// Bytewise slice equality
 /// NOTE: This function is (ab)used in rustc::middle::trans::_match
 /// to compare &[u8] byte slices that are not necessarily valid UTF-8.
-#[lang="str_eq"]
+#[lang = "str_eq"]
 #[inline]
 fn eq_slice(a: &str, b: &str) -> bool {
     eq_slice_(a, b)
@@ -1019,14 +1213,16 @@ fn run_utf8_validation_iterator(iter: &mut slice::Iter<u8>)
         // restore the iterator we had at the start of this codepoint.
         macro_rules! err { () => {{
             *iter = old.clone();
-            return Err(Utf8Error::InvalidByte(whole.len() - iter.as_slice().len()))
+            return Err(Utf8Error {
+                valid_up_to: whole.len() - iter.as_slice().len()
+            })
         }}}
 
         macro_rules! next { () => {
             match iter.next() {
                 Some(a) => *a,
                 // we needed data, but there was none: error!
-                None => return Err(Utf8Error::TooShort),
+                None => err!(),
             }
         }}
 
@@ -1040,7 +1236,7 @@ fn run_utf8_validation_iterator(iter: &mut slice::Iter<u8>)
         // ASCII characters are always valid, so only large
         // bytes need more examination.
         if first >= 128 {
-            let w = UTF8_CHAR_WIDTH[first as usize] as usize;
+            let w = UTF8_CHAR_WIDTH[first as usize];
             let second = next!();
             // 2-byte encoding is for codepoints  \u{0080} to  \u{07ff}
             //        first  C2 80        last DF BF
@@ -1108,9 +1304,11 @@ static UTF8_CHAR_WIDTH: [u8; 256] = [
 /// Struct that contains a `char` and the index of the first byte of
 /// the next `char` in a string.  This can be used as a data structure
 /// for iterating over the UTF-8 bytes of a string.
-#[derive(Copy)]
-#[unstable(feature = "core",
-           reason = "naming is uncertain with container conventions")]
+#[derive(Copy, Clone)]
+#[unstable(feature = "str_char",
+           reason = "existence of this struct is uncertain as it is frequently \
+                     able to be replaced with char.len_utf8() and/or \
+                     char/char_indices iterators")]
 pub struct CharRange {
     /// Current `char`
     pub ch: char,
@@ -1130,7 +1328,7 @@ Section: Trait implementations
 mod traits {
     use cmp::{Ordering, Ord, PartialEq, PartialOrd, Eq};
     use cmp::Ordering::{Less, Equal, Greater};
-    use iter::IteratorExt;
+    use iter::Iterator;
     use option::Option;
     use option::Option::Some;
     use ops;
@@ -1181,9 +1379,9 @@ mod traits {
     /// Panics when `begin` and `end` do not point to valid characters
     /// or point beyond the last character of the string.
     ///
-    /// # Example
+    /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// let s = "Löwe 老虎 Léopard";
     /// assert_eq!(&s[0 .. 1], "L");
     ///
@@ -1203,7 +1401,7 @@ mod traits {
     impl ops::Index<ops::Range<usize>> for str {
         type Output = str;
         #[inline]
-        fn index(&self, index: &ops::Range<usize>) -> &str {
+        fn index(&self, index: ops::Range<usize>) -> &str {
             // is_char_boundary checks that the index is in [0, .len()]
             if index.start <= index.end &&
                self.is_char_boundary(index.start) &&
@@ -1225,8 +1423,9 @@ mod traits {
     #[stable(feature = "rust1", since = "1.0.0")]
     impl ops::Index<ops::RangeTo<usize>> for str {
         type Output = str;
+
         #[inline]
-        fn index(&self, index: &ops::RangeTo<usize>) -> &str {
+        fn index(&self, index: ops::RangeTo<usize>) -> &str {
             // is_char_boundary checks that the index is in [0, .len()]
             if self.is_char_boundary(index.end) {
                 unsafe { self.slice_unchecked(0, index.end) }
@@ -1245,8 +1444,9 @@ mod traits {
     #[stable(feature = "rust1", since = "1.0.0")]
     impl ops::Index<ops::RangeFrom<usize>> for str {
         type Output = str;
+
         #[inline]
-        fn index(&self, index: &ops::RangeFrom<usize>) -> &str {
+        fn index(&self, index: ops::RangeFrom<usize>) -> &str {
             // is_char_boundary checks that the index is in [0, .len()]
             if self.is_char_boundary(index.start) {
                 unsafe { self.slice_unchecked(index.start, self.len()) }
@@ -1259,71 +1459,17 @@ mod traits {
     #[stable(feature = "rust1", since = "1.0.0")]
     impl ops::Index<ops::RangeFull> for str {
         type Output = str;
+
         #[inline]
-        fn index(&self, _index: &ops::RangeFull) -> &str {
+        fn index(&self, _index: ops::RangeFull) -> &str {
             self
         }
     }
 }
 
-/// Any string that can be represented as a slice
-#[unstable(feature = "core",
-           reason = "Instead of taking this bound generically, this trait will be \
-                     replaced with one of slicing syntax (&foo[..]), deref coercions, or \
-                     a more generic conversion trait")]
-pub trait Str {
-    /// Work with `self` as a slice.
-    fn as_slice<'a>(&'a self) -> &'a str;
-}
-
-impl Str for str {
-    #[inline]
-    fn as_slice<'a>(&'a self) -> &'a str { self }
-}
-
-impl<'a, S: ?Sized> Str for &'a S where S: Str {
-    #[inline]
-    fn as_slice(&self) -> &str { Str::as_slice(*self) }
-}
-
-/// Return type of `StrExt::split`
-#[stable(feature = "rust1", since = "1.0.0")]
-pub struct Split<'a, P: Pattern<'a>>(CharSplits<'a, P>);
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a, P: Pattern<'a>> Iterator for Split<'a, P> {
-    type Item = &'a str;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a str> {
-        self.0.next()
-    }
-}
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a, P: Pattern<'a>> DoubleEndedIterator for Split<'a, P>
-where P::Searcher: DoubleEndedSearcher<'a> {
-    #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
-        self.0.next_back()
-    }
-}
-
-/// Return type of `StrExt::split_terminator`
-#[stable(feature = "rust1", since = "1.0.0")]
-pub struct SplitTerminator<'a, P: Pattern<'a>>(CharSplits<'a, P>);
-delegate_iter!{pattern &'a str : SplitTerminator<'a, P>}
-
-/// Return type of `StrExt::splitn`
-#[stable(feature = "rust1", since = "1.0.0")]
-pub struct SplitN<'a, P: Pattern<'a>>(CharSplitsN<'a, P>);
-delegate_iter!{pattern forward &'a str : SplitN<'a, P>}
-
-/// Return type of `StrExt::rsplitn`
-#[stable(feature = "rust1", since = "1.0.0")]
-pub struct RSplitN<'a, P: Pattern<'a>>(CharSplitsN<'a, P>);
-delegate_iter!{pattern forward &'a str : RSplitN<'a, P>}
-
 /// Methods for string slices
 #[allow(missing_docs)]
+#[doc(hidden)]
 pub trait StrExt {
     // NB there are no docs here are they're all located on the StrExt trait in
     // libcollections, not here.
@@ -1334,12 +1480,20 @@ pub trait StrExt {
     fn bytes<'a>(&'a self) -> Bytes<'a>;
     fn char_indices<'a>(&'a self) -> CharIndices<'a>;
     fn split<'a, P: Pattern<'a>>(&'a self, pat: P) -> Split<'a, P>;
+    fn rsplit<'a, P: Pattern<'a>>(&'a self, pat: P) -> RSplit<'a, P>
+        where P::Searcher: ReverseSearcher<'a>;
     fn splitn<'a, P: Pattern<'a>>(&'a self, count: usize, pat: P) -> SplitN<'a, P>;
+    fn rsplitn<'a, P: Pattern<'a>>(&'a self, count: usize, pat: P) -> RSplitN<'a, P>
+        where P::Searcher: ReverseSearcher<'a>;
     fn split_terminator<'a, P: Pattern<'a>>(&'a self, pat: P) -> SplitTerminator<'a, P>;
-    fn rsplitn<'a, P: Pattern<'a>>(&'a self, count: usize, pat: P) -> RSplitN<'a, P>;
+    fn rsplit_terminator<'a, P: Pattern<'a>>(&'a self, pat: P) -> RSplitTerminator<'a, P>
+        where P::Searcher: ReverseSearcher<'a>;
+    fn matches<'a, P: Pattern<'a>>(&'a self, pat: P) -> Matches<'a, P>;
+    fn rmatches<'a, P: Pattern<'a>>(&'a self, pat: P) -> RMatches<'a, P>
+        where P::Searcher: ReverseSearcher<'a>;
     fn match_indices<'a, P: Pattern<'a>>(&'a self, pat: P) -> MatchIndices<'a, P>;
-    #[allow(deprecated) /* for SplitStr */]
-    fn split_str<'a, P: Pattern<'a>>(&'a self, pat: P) -> SplitStr<'a, P>;
+    fn rmatch_indices<'a, P: Pattern<'a>>(&'a self, pat: P) -> RMatchIndices<'a, P>
+        where P::Searcher: ReverseSearcher<'a>;
     fn lines<'a>(&'a self) -> Lines<'a>;
     fn lines_any<'a>(&'a self) -> LinesAny<'a>;
     fn char_len(&self) -> usize;
@@ -1406,7 +1560,7 @@ impl StrExt for str {
 
     #[inline]
     fn split<'a, P: Pattern<'a>>(&'a self, pat: P) -> Split<'a, P> {
-        Split(CharSplits {
+        Split(SplitInternal {
             start: 0,
             end: self.len(),
             matcher: pat.into_searcher(self),
@@ -1416,56 +1570,73 @@ impl StrExt for str {
     }
 
     #[inline]
+    fn rsplit<'a, P: Pattern<'a>>(&'a self, pat: P) -> RSplit<'a, P>
+        where P::Searcher: ReverseSearcher<'a>
+    {
+        RSplit(self.split(pat).0)
+    }
+
+    #[inline]
     fn splitn<'a, P: Pattern<'a>>(&'a self, count: usize, pat: P) -> SplitN<'a, P> {
-        SplitN(CharSplitsN {
+        SplitN(SplitNInternal {
             iter: self.split(pat).0,
             count: count,
-            invert: false,
         })
     }
 
     #[inline]
+    fn rsplitn<'a, P: Pattern<'a>>(&'a self, count: usize, pat: P) -> RSplitN<'a, P>
+        where P::Searcher: ReverseSearcher<'a>
+    {
+        RSplitN(self.splitn(count, pat).0)
+    }
+
+    #[inline]
     fn split_terminator<'a, P: Pattern<'a>>(&'a self, pat: P) -> SplitTerminator<'a, P> {
-        SplitTerminator(CharSplits {
+        SplitTerminator(SplitInternal {
             allow_trailing_empty: false,
             ..self.split(pat).0
         })
     }
 
     #[inline]
-    fn rsplitn<'a, P: Pattern<'a>>(&'a self, count: usize, pat: P) -> RSplitN<'a, P> {
-        RSplitN(CharSplitsN {
-            iter: self.split(pat).0,
-            count: count,
-            invert: true,
-        })
+    fn rsplit_terminator<'a, P: Pattern<'a>>(&'a self, pat: P) -> RSplitTerminator<'a, P>
+        where P::Searcher: ReverseSearcher<'a>
+    {
+        RSplitTerminator(self.split_terminator(pat).0)
+    }
+
+    #[inline]
+    fn matches<'a, P: Pattern<'a>>(&'a self, pat: P) -> Matches<'a, P> {
+        Matches(MatchesInternal(pat.into_searcher(self)))
+    }
+
+    #[inline]
+    fn rmatches<'a, P: Pattern<'a>>(&'a self, pat: P) -> RMatches<'a, P>
+        where P::Searcher: ReverseSearcher<'a>
+    {
+        RMatches(self.matches(pat).0)
     }
 
     #[inline]
     fn match_indices<'a, P: Pattern<'a>>(&'a self, pat: P) -> MatchIndices<'a, P> {
-        MatchIndices(pat.into_searcher(self))
+        MatchIndices(MatchIndicesInternal(pat.into_searcher(self)))
     }
 
     #[inline]
-    #[allow(deprecated) /* for SplitStr */ ]
-    fn split_str<'a, P: Pattern<'a>>(&'a self, pat: P) -> SplitStr<'a, P> {
-        SplitStr(self.split(pat))
+    fn rmatch_indices<'a, P: Pattern<'a>>(&'a self, pat: P) -> RMatchIndices<'a, P>
+        where P::Searcher: ReverseSearcher<'a>
+    {
+        RMatchIndices(self.match_indices(pat).0)
     }
-
     #[inline]
     fn lines(&self) -> Lines {
-        Lines { inner: self.split_terminator('\n').0 }
+        Lines(self.split_terminator('\n'))
     }
 
+    #[inline]
     fn lines_any(&self) -> LinesAny {
-        fn f(line: &str) -> &str {
-            let l = line.len();
-            if l > 0 && line.as_bytes()[l - 1] == b'\r' { &line[0 .. l - 1] }
-            else { line }
-        }
-
-        let f: fn(&str) -> &str = f; // coerce to fn pointer
-        LinesAny { inner: self.lines().map(f) }
+        LinesAny(self.lines().map(LinesAnyMap))
     }
 
     #[inline]
@@ -1497,7 +1668,7 @@ impl StrExt for str {
     #[inline]
     unsafe fn slice_unchecked(&self, begin: usize, end: usize) -> &str {
         mem::transmute(Slice {
-            data: self.as_ptr().offset(begin as int),
+            data: self.as_ptr().offset(begin as isize),
             len: end - begin,
         })
     }
@@ -1594,14 +1765,14 @@ impl StrExt for str {
                 i -= 1;
             }
 
-            let mut val = s.as_bytes()[i] as u32;
-            let w = UTF8_CHAR_WIDTH[val as usize] as usize;
-            assert!((w != 0));
+            let first= s.as_bytes()[i];
+            let w = UTF8_CHAR_WIDTH[first as usize];
+            assert!(w != 0);
 
-            val = utf8_first_byte!(val, w);
-            val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 1]);
-            if w > 2 { val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 2]); }
-            if w > 3 { val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 3]); }
+            let mut val = utf8_first_byte(first, w as u32);
+            val = utf8_acc_cont_byte(val, s.as_bytes()[i + 1]);
+            if w > 2 { val = utf8_acc_cont_byte(val, s.as_bytes()[i + 2]); }
+            if w > 3 { val = utf8_acc_cont_byte(val, s.as_bytes()[i + 3]); }
 
             return CharRange {ch: unsafe { mem::transmute(val) }, next: i};
         }
@@ -1643,8 +1814,8 @@ impl StrExt for str {
         if self.is_empty() {
             None
         } else {
-            let CharRange {ch, next} = self.char_range_at(0);
-            let next_s = unsafe { self.slice_unchecked(next, self.len()) };
+            let ch = self.char_at(0);
+            let next_s = unsafe { self.slice_unchecked(ch.len_utf8(), self.len()) };
             Some((ch, next_s))
         }
     }
@@ -1675,6 +1846,14 @@ impl StrExt for str {
     fn parse<T: FromStr>(&self) -> Result<T, T::Err> { FromStr::from_str(self) }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
+impl AsRef<[u8]> for str {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
 /// Pluck a code point out of a UTF-8-like byte slice and return the
 /// index of the next code point.
 #[inline]
@@ -1686,16 +1865,16 @@ pub fn char_range_at_raw(bytes: &[u8], i: usize) -> (u32, usize) {
 
     // Multibyte case is a fn to allow char_range_at to inline cleanly
     fn multibyte_char_range_at(bytes: &[u8], i: usize) -> (u32, usize) {
-        let mut val = bytes[i] as u32;
-        let w = UTF8_CHAR_WIDTH[val as usize] as usize;
-        assert!((w != 0));
+        let first = bytes[i];
+        let w = UTF8_CHAR_WIDTH[first as usize];
+        assert!(w != 0);
 
-        val = utf8_first_byte!(val, w);
-        val = utf8_acc_cont_byte!(val, bytes[i + 1]);
-        if w > 2 { val = utf8_acc_cont_byte!(val, bytes[i + 2]); }
-        if w > 3 { val = utf8_acc_cont_byte!(val, bytes[i + 3]); }
+        let mut val = utf8_first_byte(first, w as u32);
+        val = utf8_acc_cont_byte(val, bytes[i + 1]);
+        if w > 2 { val = utf8_acc_cont_byte(val, bytes[i + 2]); }
+        if w > 3 { val = utf8_acc_cont_byte(val, bytes[i + 3]); }
 
-        return (val, i + w);
+        return (val, i + w as usize);
     }
 
     multibyte_char_range_at(bytes, i)
@@ -1705,36 +1884,4 @@ pub fn char_range_at_raw(bytes: &[u8], i: usize) -> (u32, usize) {
 impl<'a> Default for &'a str {
     #[stable(feature = "rust1", since = "1.0.0")]
     fn default() -> &'a str { "" }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a> Iterator for Lines<'a> {
-    type Item = &'a str;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a str> { self.inner.next() }
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) { self.inner.size_hint() }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a> DoubleEndedIterator for Lines<'a> {
-    #[inline]
-    fn next_back(&mut self) -> Option<&'a str> { self.inner.next_back() }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a> Iterator for LinesAny<'a> {
-    type Item = &'a str;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a str> { self.inner.next() }
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) { self.inner.size_hint() }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<'a> DoubleEndedIterator for LinesAny<'a> {
-    #[inline]
-    fn next_back(&mut self) -> Option<&'a str> { self.inner.next_back() }
 }

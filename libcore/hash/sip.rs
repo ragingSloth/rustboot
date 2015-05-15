@@ -7,14 +7,12 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-//
-// ignore-lexer-test FIXME #15883
 
 //! An implementation of SipHash 2-4.
 
+#![allow(deprecated)] // until the next snapshot for inherent wrapping ops
+
 use prelude::*;
-use default::Default;
-use num::wrapping::WrappingOps;
 use super::Hasher;
 
 /// An implementation of SipHash 2-4.
@@ -71,7 +69,7 @@ macro_rules! u8to64_le {
 
 macro_rules! rotl {
     ($x:expr, $b:expr) =>
-    (($x << $b) | ($x >> (64.wrapping_sub($b))))
+    (($x << $b) | ($x >> (64_i32.wrapping_sub($b))))
 }
 
 macro_rules! compress {
@@ -113,11 +111,7 @@ impl SipHasher {
         state
     }
 
-    /// Returns the computed hash.
-    #[unstable(feature = "hash")]
-    #[deprecated(since = "1.0.0", reason = "renamed to finish")]
-    pub fn result(&self) -> u64 { self.finish() }
-
+    #[inline]
     fn reset(&mut self) {
         self.length = 0;
         self.v0 = self.k0 ^ 0x736f6d6570736575;
@@ -127,6 +121,7 @@ impl SipHasher {
         self.ntail = 0;
     }
 
+    #[inline]
     fn write(&mut self, msg: &[u8]) {
         let length = msg.len();
         self.length += length;
@@ -180,6 +175,7 @@ impl Hasher for SipHasher {
         self.write(msg)
     }
 
+    #[inline]
     fn finish(&self) -> u64 {
         let mut v0 = self.v0;
         let mut v1 = self.v1;

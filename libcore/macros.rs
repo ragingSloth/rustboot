@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-/// Entry point of task panic, for details, see std::macros
+/// Entry point of thread panic, for details, see std::macros
 #[macro_export]
 macro_rules! panic {
     () => (
@@ -33,7 +33,7 @@ macro_rules! panic {
 /// This will invoke the `panic!` macro if the provided expression cannot be
 /// evaluated to `true` at runtime.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// // the panic message for these assertions is the stringified value of the
@@ -66,12 +66,12 @@ macro_rules! assert {
     );
 }
 
-/// Asserts that two expressions are equal to each other, testing equality in
-/// both directions.
+/// Asserts that two expressions are equal to each other.
 ///
-/// On panic, this macro will print the values of the expressions.
+/// On panic, this macro will print the values of the expressions with their
+/// debug representations.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// let a = 3;
@@ -84,10 +84,8 @@ macro_rules! assert_eq {
     ($left:expr , $right:expr) => ({
         match (&($left), &($right)) {
             (left_val, right_val) => {
-                // check both directions of equality....
-                if !((*left_val == *right_val) &&
-                     (*right_val == *left_val)) {
-                    panic!("assertion failed: `(left == right) && (right == left)` \
+                if !(*left_val == *right_val) {
+                    panic!("assertion failed: `(left == right)` \
                            (left: `{:?}`, right: `{:?}`)", *left_val, *right_val)
                 }
             }
@@ -107,7 +105,7 @@ macro_rules! assert_eq {
 /// expensive to be present in a release build but may be helpful during
 /// development.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// // the panic message for these assertions is the stringified value of the
@@ -142,7 +140,7 @@ macro_rules! debug_assert {
 /// expensive to be present in a release build but may be helpful during
 /// development.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// let a = 3;
@@ -156,7 +154,7 @@ macro_rules! debug_assert_eq {
 
 /// Short circuiting evaluation on Err
 ///
-/// `libstd` contains a more general `try!` macro that uses `FromError`.
+/// `libstd` contains a more general `try!` macro that uses `From<E>`.
 #[macro_export]
 macro_rules! try {
     ($e:expr) => ({
@@ -169,13 +167,14 @@ macro_rules! try {
     })
 }
 
-/// Use the `format!` syntax to write data into a buffer of type `&mut Writer`.
+/// Use the `format!` syntax to write data into a buffer of type `&mut Write`.
 /// See `std::fmt` for more information.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// # #![allow(unused_must_use)]
+/// use std::io::Write;
 ///
 /// let mut w = Vec::new();
 /// write!(&mut w, "test");
@@ -183,7 +182,7 @@ macro_rules! try {
 /// ```
 #[macro_export]
 macro_rules! write {
-    ($dst:expr, $($arg:tt)*) => ((&mut *$dst).write_fmt(format_args!($($arg)*)))
+    ($dst:expr, $($arg:tt)*) => ($dst.write_fmt(format_args!($($arg)*)))
 }
 
 /// Equivalent to the `write!` macro, except that a newline is appended after
@@ -216,8 +215,8 @@ macro_rules! writeln {
 ///
 /// Match arms:
 ///
-/// ```rust
-/// fn foo(x: Option<int>) {
+/// ```
+/// fn foo(x: Option<i32>) {
 ///     match x {
 ///         Some(n) if n >= 0 => println!("Some(Non-negative)"),
 ///         Some(n) if n <  0 => println!("Some(Negative)"),
@@ -229,9 +228,9 @@ macro_rules! writeln {
 ///
 /// Iterators:
 ///
-/// ```rust
+/// ```
 /// fn divide_by_three(x: u32) -> u32 { // one of the poorest implementations of x/3
-///     for i in std::iter::count(0, 1) {
+///     for i in 0.. {
 ///         if 3*i < i { panic!("u32 overflow"); }
 ///         if x < 3*i { return i-1; }
 ///     }

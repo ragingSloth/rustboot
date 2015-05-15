@@ -2,7 +2,6 @@
 %include "isr.asm"
 %include "gdt.asm"
 extern main
-extern _load_gdt
 extern _load_idt
 
 global start
@@ -35,9 +34,10 @@ mboot:
     dd end
     dd start
 stub:
-    call _load_gdt
-    call _load_idt
-    lidt [idtr]
+    cli
+    lgdt [gdtr]
+    ;call _load_idt
+    ;lidt [idtr]
     sti
     call main
     jmp $

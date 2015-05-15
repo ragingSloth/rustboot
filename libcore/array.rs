@@ -14,8 +14,11 @@
 
 #![unstable(feature = "core")] // not yet reviewed
 
+#![doc(primitive = "array")]
+
 use clone::Clone;
 use cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
+use convert::{AsRef, AsMut};
 use fmt;
 use hash::{Hash, self};
 use iter::IntoIterator;
@@ -23,10 +26,52 @@ use marker::{Copy, Sized};
 use option::Option;
 use slice::{Iter, IterMut, SliceExt};
 
+/// Utility trait implemented only on arrays of fixed size
+///
+/// This trait can be used to implement other traits on fixed-size arrays
+/// without causing much metadata bloat.
+#[unstable(feature = "core")]
+pub trait FixedSizeArray<T> {
+    /// Converts the array to immutable slice
+    fn as_slice(&self) -> &[T];
+    /// Converts the array to mutable slice
+    fn as_mut_slice(&mut self) -> &mut [T];
+}
+
 // macro for implementing n-ary tuple functions and operations
 macro_rules! array_impls {
     ($($N:expr)+) => {
         $(
+            #[unstable(feature = "core")]
+            impl<T> FixedSizeArray<T> for [T; $N] {
+                #[inline]
+                fn as_slice(&self) -> &[T] {
+                    &self[..]
+                }
+                #[inline]
+                fn as_mut_slice(&mut self) -> &mut [T] {
+                    &mut self[..]
+                }
+            }
+
+            #[unstable(feature = "array_as_ref",
+                       reason = "should ideally be implemented for all fixed-sized arrays")]
+            impl<T> AsRef<[T]> for [T; $N] {
+                #[inline]
+                fn as_ref(&self) -> &[T] {
+                    &self[..]
+                }
+            }
+
+            #[unstable(feature = "array_as_ref",
+                       reason = "should ideally be implemented for all fixed-sized arrays")]
+            impl<T> AsMut<[T]> for [T; $N] {
+                #[inline]
+                fn as_mut(&mut self) -> &mut [T] {
+                    &mut self[..]
+                }
+            }
+
             #[stable(feature = "rust1", since = "1.0.0")]
             impl<T:Copy> Clone for [T; $N] {
                 fn clone(&self) -> [T; $N] {
