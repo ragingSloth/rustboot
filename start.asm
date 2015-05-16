@@ -1,5 +1,7 @@
 [BITS 32]
 global start
+global __morestack
+
 start:
     mov esp, _sys_stack
     jmp stublet
@@ -71,6 +73,9 @@ idt_load:
     ret
 
 %include "isr.asm"
+
+__morestack:
+    jmp $
 
 SECTION .bss
     resb 8192
