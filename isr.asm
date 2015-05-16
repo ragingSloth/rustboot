@@ -1,6 +1,3 @@
-extern _fault_handler
-extern _irq_handler
-
 %macro ISR_RET 1
     global _isr%1
     _isr%1:
@@ -77,58 +74,58 @@ isr_stub:
     iret
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;IRQs
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%macro IRQ 1
-    global _irq%1
-    _irq%1:
-        cli
-        push byte 0
-        push byte %1
-        jmp irq_stub
-%endmacro
-
-IRQ 0
-IRQ 1
-IRQ 2
-IRQ 3
-IRQ 4
-IRQ 5
-IRQ 6
-IRQ 7
-IRQ 8
-IRQ 9
-IRQ 10
-IRQ 11
-IRQ 12
-IRQ 13
-IRQ 14
-IRQ 15
-
-irq_stub:
-    pusha
-    push ds
-    push es
-    push fs
-    push gs
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov eax, esp
-    push eax
-
-    mov eax, _irq_handler
-    call eax
-
-    pop eax
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    popa
-    add esp, 8
-    sti
-    iret
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;IRQs
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;%macro IRQ 1
+;    global _irq%1
+;    _irq%1:
+;        cli
+;        push byte 0
+;        push byte %1
+;        jmp irq_stub
+;%endmacro
+;
+;IRQ 0
+;IRQ 1
+;IRQ 2
+;IRQ 3
+;IRQ 4
+;IRQ 5
+;IRQ 6
+;IRQ 7
+;IRQ 8
+;IRQ 9
+;IRQ 10
+;IRQ 11
+;IRQ 12
+;IRQ 13
+;IRQ 14
+;IRQ 15
+;
+;irq_stub:
+;    pusha
+;    push ds
+;    push es
+;    push fs
+;    push gs
+;    mov ax, 0x10
+;    mov ds, ax
+;    mov es, ax
+;    mov fs, ax
+;    mov gs, ax
+;    mov eax, esp
+;    push eax
+;
+;    mov eax, _irq_handler
+;    call eax
+;
+;    pop eax
+;    pop gs
+;    pop fs
+;    pop es
+;    pop ds
+;    popa
+;    add esp, 8
+;    sti
+;    iret

@@ -29,9 +29,9 @@ pub fn inb(addr: u8) -> u8 {
 //////////////////////////////////////////////////////
 //lang_items
 //////////////////////////////////////////////////////
-#[lang = "stack_exhausted"] extern fn stack_exhausted() {}
-#[lang = "eh_personality"] extern fn eh_personality() {}
-#[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {}  }
+//#[lang = "stack_exhausted"] extern fn stack_exhausted() {}
+//#[lang = "eh_personality"] extern fn eh_personality() {}
+//#[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {}  }
 
 //extern "rust-intrinsic" {
 //    pub fn transmute<T, U>(x: T) -> U;

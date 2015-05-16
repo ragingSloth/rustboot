@@ -6,7 +6,7 @@ extern crate core;
 pub mod std {pub use core::*;}
 pub mod utils;
 pub mod io;
-pub mod idt;
+//pub mod idt;
 
 
 #[no_mangle]
@@ -20,5 +20,4 @@ pub extern "C" fn main() {
         fg : io::Black as u16, 
     };
     x.puts("hello world!");
-    loop {}
 }
