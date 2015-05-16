@@ -1,8 +1,8 @@
 #![macro_use]
 use core;
 use core::prelude::{Option, None, Some};
-use core::intrinsics::offset*;
-use core::ptr::PtrExt;
+use core::intrinsics::offset;
+//use core::ptr::PtrExt;
 
 pub fn outb(addr: u8, data: u8) {
     unsafe {

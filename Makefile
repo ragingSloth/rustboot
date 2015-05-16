@@ -6,7 +6,7 @@ QEMU=qemu-system-i386
 RUSTCFLAGS= -L . -O --target i686-unknown-linux-gnu --crate-type lib -C relocation-model=static
 
 .SUFFIXES: .o .rs .asm
-.PHONY: clean run reset
+.PHONY: clean run reset bin
 
 all: kernel.bin
 
@@ -31,8 +31,8 @@ reset:
 
 run: test.iso
 	$(QEMU) -cdrom $<
-#run: kernel.bin
-#	$(QEMU) -kernel $<
+bin: kernel.bin
+	$(QEMU) -kernel $<
 
 
 test.iso: kernel.bin

@@ -1,5 +1,5 @@
-#![feature(asm, lang_items, no_std)]
-#[no_std]
+#![no_std]
+#![feature(asm, lang_items, no_std, core)]
 #[allow(missing_copy_implementations, unused_imports, unstable, improper_ctypes)]
 extern crate core;
 

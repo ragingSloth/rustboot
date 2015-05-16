@@ -5,7 +5,7 @@ use utils;
 use utils::{IntRange};
 use io;
 
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 #[repr(C, packed)]
 struct IDT {
     base1: u16,

@@ -1,6 +1,5 @@
 [BITS 32]
 %include "isr.asm"
-%include "gdt.asm"
 extern main
 extern _load_idt
 
@@ -34,13 +33,49 @@ mboot:
     dd end
     dd start
 stub:
-    cli
-    lgdt [gdtr]
     ;call _load_idt
     ;lidt [idtr]
+    ;sti
+    jmp load_gdt
+    ;jmp $
+
+main_wrapper:
     sti
     call main
     jmp $
+
+load_gdt:
+    mov eax, 2 << 3
+    mov ds, eax
+    mov es, eax
+    mov fs, eax
+    mov gs, eax
+    mov ss, eax
+    cli
+    lgdt [gdtr]
+    jmp (1 << 3):main_wrapper
+
+gdtr:
+    dw (gdt_end - gdt) + 1
+    dd gdt
+
+gdt:
+    dq 0
+   ;CS 
+    dw 0xffff       ; limit 0:15
+    dw 0x0000       ; base 0:15
+    db 0x00         ; base 16:23
+    db 0b10011010   ; access byte - code
+    db 0x4f         ; flags/(limit 16:19). flag is set to 32 bit protected mode
+    db 0x00         ; base 24:31
+    ;DS
+    dw 0xffff       ; limit 0:15
+    dw 0x0000       ; base 0:15
+    db 0x00         ; base 16:23
+    db 0b10010010   ; access byte - data
+    db 0x4f         ; flags/(limit 16:19). flag is set to 32 bit protected mode
+    db 0x00         ; base 24:31
+gdt_end:
 
 SECTION .bss
     resb 8192

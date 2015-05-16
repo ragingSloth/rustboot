@@ -1,7 +1,7 @@
 pub use self::Colors::*;
 
-use utils::{transmute, IntRange};
-use core::prelude::{SliceExt, StrExt, Str};
+use utils::IntRange;
+use core::prelude::{SliceExt, StrExt};
 
 #[repr(u16)]
 pub enum Colors {
