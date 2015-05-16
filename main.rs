@@ -28,4 +28,5 @@ pub extern "C" fn main() {
         fg : io::Black as u16, 
     };
     x.puts("hello world!");
+    loop {}
 }

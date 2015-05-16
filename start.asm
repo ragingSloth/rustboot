@@ -28,6 +28,7 @@ mboot:
 
 stublet:
     cli
+    jmp k_main
     lgdt [gdtr]
     mov ax, 0x10
     mov ds, ax
@@ -39,14 +40,14 @@ stublet:
 
 k_main:
     extern setup
-    call setup
+    ;call setup
     sti
     extern main
     call main
     jmp $
     
 gdtr:
-	dw gdt - gdt_end  ;might need to add 1
+	dw (gdt - gdt_end) + 1
 	dd gdt
 gdt:
     dq 0
