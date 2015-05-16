@@ -1,5 +1,6 @@
 use io;
 use idt::set_gate;
+use core::slice::SliceExt;
 
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -72,45 +73,45 @@ pub unsafe extern "C" fn fault_handler(r: Regs) {
             bg : io::Green as u16,
             fg : io::Black as u16, 
         };
-        x.puts(messages[r.int_no]);
+        x.puts(messages.get_unchecked(r.int_no));
         x.puts(" Exception. System Halted!");
         loop {}
     }
 }
 
 pub fn install_isrs() {
-    set_gate(0, ((&_isr0 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(1, ((&_isr1 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(2, ((&_isr2 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(3, ((&_isr3 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(4, ((&_isr4 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(5, ((&_isr5 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(6, ((&_isr6 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(7, ((&_isr7 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(8, ((&_isr8 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(9, ((&_isr9 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(10, ((&_isr10 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(11, ((&_isr11 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(12, ((&_isr12 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(13, ((&_isr13 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(14, ((&_isr14 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(15, ((&_isr15 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(16, ((&_isr16 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(17, ((&_isr17 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(18, ((&_isr18 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(19, ((&_isr19 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(20, ((&_isr20 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(21, ((&_isr21 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(22, ((&_isr22 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(23, ((&_isr23 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(24, ((&_isr24 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(25, ((&_isr25 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(26, ((&_isr26 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(27, ((&_isr27 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(28, ((&_isr28 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(29, ((&_isr29 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(30, ((&_isr30 as *const _ )as usize), 0x08, 0x8E);
-    set_gate(31, ((&_isr31 as *const _ )as usize), 0x08, 0x8E);
+    set_gate(0, (_isr0 as usize), 0x08, 0x8E);
+    set_gate(1, (_isr1 as usize), 0x08, 0x8E);
+    set_gate(2, (_isr2 as usize), 0x08, 0x8E);
+    set_gate(3, (_isr3 as usize), 0x08, 0x8E);
+    set_gate(4, (_isr4 as usize), 0x08, 0x8E);
+    set_gate(5, (_isr5 as usize), 0x08, 0x8E);
+    set_gate(6, (_isr6 as usize), 0x08, 0x8E);
+    set_gate(7, (_isr7 as usize), 0x08, 0x8E);
+    set_gate(8, (_isr8 as usize), 0x08, 0x8E);
+    set_gate(9, (_isr9 as usize), 0x08, 0x8E);
+    set_gate(10, (_isr10 as usize), 0x08, 0x8E);
+    set_gate(11, (_isr11 as usize), 0x08, 0x8E);
+    set_gate(12, (_isr12 as usize), 0x08, 0x8E);
+    set_gate(13, (_isr13 as usize), 0x08, 0x8E);
+    set_gate(14, (_isr14 as usize), 0x08, 0x8E);
+    set_gate(15, (_isr15 as usize), 0x08, 0x8E);
+    set_gate(16, (_isr16 as usize), 0x08, 0x8E);
+    set_gate(17, (_isr17 as usize), 0x08, 0x8E);
+    set_gate(18, (_isr18 as usize), 0x08, 0x8E);
+    set_gate(19, (_isr19 as usize), 0x08, 0x8E);
+    set_gate(20, (_isr20 as usize), 0x08, 0x8E);
+    set_gate(21, (_isr21 as usize), 0x08, 0x8E);
+    set_gate(22, (_isr22 as usize), 0x08, 0x8E);
+    set_gate(23, (_isr23 as usize), 0x08, 0x8E);
+    set_gate(24, (_isr24 as usize), 0x08, 0x8E);
+    set_gate(25, (_isr25 as usize), 0x08, 0x8E);
+    set_gate(26, (_isr26 as usize), 0x08, 0x8E);
+    set_gate(27, (_isr27 as usize), 0x08, 0x8E);
+    set_gate(28, (_isr28 as usize), 0x08, 0x8E);
+    set_gate(29, (_isr29 as usize), 0x08, 0x8E);
+    set_gate(30, (_isr30 as usize), 0x08, 0x8E);
+    set_gate(31, (_isr31 as usize), 0x08, 0x8E);
 
 }
 

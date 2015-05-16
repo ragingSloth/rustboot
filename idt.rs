@@ -1,4 +1,5 @@
 use core::intrinsics::size_of;
+use core::slice::SliceExt;
 
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
@@ -30,10 +31,10 @@ pub fn set_gate(num: usize, base: usize, sel: u16, flags: u8) {
     unsafe {
         let bas_lo = ((base & 0xFFFF0000) >> 16) as u16;
         let bas_hi = (base & 0x0000FFFF) as u16;
-        idt[num].base_lo = bas_lo;
-        idt[num].base_hi = bas_hi;
-        idt[num].sel = sel;
-        idt[num].flags = flags;
+        idt.get_unchecked_mut(num).base_lo = bas_lo;
+        idt.get_unchecked_mut(num).base_hi = bas_hi;
+        idt.get_unchecked_mut(num).sel = sel;
+        idt.get_unchecked_mut(num).flags = flags;
     }
 }
 
