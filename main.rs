@@ -6,8 +6,16 @@ extern crate core;
 pub mod std {pub use core::*;}
 pub mod utils;
 pub mod io;
-//pub mod idt;
+pub mod idt;
+pub mod isr;
 
+
+#[no_mangle]
+#[no_stack_check]
+pub extern "C" fn setup() {
+    idt::install_idt();
+    isr::install_isrs();
+}
 
 #[no_mangle]
 #[no_stack_check]

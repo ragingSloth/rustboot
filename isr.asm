@@ -46,6 +46,7 @@ ISR_RET 29
 ISR_RET 30
 ISR_RET 31
 
+extern fault_handler
 isr_stub:
     pusha
     push ds
@@ -61,7 +62,7 @@ isr_stub:
     mov eax, esp
     push eax
     
-    mov eax, _fault_handler
+    mov eax, fault_handler
     call eax
 
     pop eax

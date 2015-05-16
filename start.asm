@@ -36,9 +36,10 @@ stublet:
     jmp 0x08:k_main
 
 k_main:
-    extern main
-
+    extern setup
+    call setup
     sti
+    extern main
     call main
     jmp $
     
@@ -63,8 +64,13 @@ gdt:
     db 0x00
 gdt_end:
 
-%isr.asm
+global idt_load
+extern _idtr
+idt_load:
+    lidt [_idtr]
+    ret
 
+%include "isr.asm"
 
 SECTION .bss
     resb 8192
