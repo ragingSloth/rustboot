@@ -27,6 +27,7 @@ pub extern "C" fn main() {
         bg : io::Red as u16,
         fg : io::Black as u16, 
     };
-    x.puts("hello world!");
+    x.puts("hello world!\n");
+    x.puts("hello world!\n");
     loop {}
 }

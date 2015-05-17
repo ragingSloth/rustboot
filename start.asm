@@ -39,8 +39,9 @@ stublet:
     jmp 0x08:k_main
 
 k_main:
+    mov [gs:0x30], dword 0
     extern setup
-    ;call setup
+    call setup
     sti
     extern main
     call main

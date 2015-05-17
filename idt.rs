@@ -41,7 +41,7 @@ pub fn set_gate(num: usize, base: usize, sel: u16, flags: u8) {
 pub fn install_idt() {
     unsafe {
         _idtr.limit = (size_of::<IDT>() * 256 - 1) as u16;
-        _idtr.base = &_idtr as *const IDTR as usize;
+        _idtr.base = &idt as *const _ as usize;
         idt_load()
     }
 }
