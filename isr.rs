@@ -2,30 +2,16 @@ use io;
 use idt::set_gate;
 use core::slice::SliceExt;
 
+//courtesy of mvdnes element76
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct Regs {
-    pub gs: usize,
-    pub fs: usize,
-    pub es: usize,
-    pub ds: usize, 
-    pub edi: usize, 
-    pub esi: usize,
-    pub ebp: usize,
-    pub esp: usize,
-    pub ebx: usize,
-    pub edx: usize,
-    pub ecx: usize,
-    pub eax: usize, 
-    pub int_no: usize,
-    pub err_code: usize,
-    pub eip: usize,
-    pub cs: usize,
-    pub eflags: usize,
-    pub useresp: usize,
-    pub ss: usize,
-
+        _ds: u32, _edi: u32, _esi: u32, _ebp: u32, _esp: u32, _ebx: u32, _edx: u32, _ecx: u32, _eax: u32,
+        int_no : u32,
+        error_code: u32,
+        _eip: u32, _cs: u32, _eflags: u32, _useresp: u32, _ss: u32,
 }
+
 
 static messages: [&'static str; 32] = [
     "Divide By Zero",
@@ -73,13 +59,16 @@ pub unsafe extern "C" fn fault_handler(r: Regs) {
             bg : io::Green as u16,
             fg : io::Black as u16, 
         };
-        x.puts(messages.get_unchecked(r.int_no));
+        if r._edx == 0x808 {
+            x.puts("well, could be worse\n")
+        }
+        x.puts(messages.get_unchecked(r.int_no as usize));
         x.puts(" Exception. System Halted!");
         loop {}
     }
 }
 
-pub fn install_isrs() {
+pub fn install_isr() {
     set_gate(0, (_isr0 as usize), 0x08, 0x8E);
     set_gate(1, (_isr1 as usize), 0x08, 0x8E);
     set_gate(2, (_isr2 as usize), 0x08, 0x8E);
@@ -112,7 +101,22 @@ pub fn install_isrs() {
     set_gate(29, (_isr29 as usize), 0x08, 0x8E);
     set_gate(30, (_isr30 as usize), 0x08, 0x8E);
     set_gate(31, (_isr31 as usize), 0x08, 0x8E);
-
+    set_gate(32, (_irq0 as usize), 0x08, 0x8E); 
+    set_gate(33, (_irq1 as usize), 0x08, 0x8E);
+    set_gate(34, (_irq2 as usize), 0x08, 0x8E);
+    set_gate(35, (_irq3 as usize), 0x08, 0x8E);
+    set_gate(36, (_irq4 as usize), 0x08, 0x8E);
+    set_gate(37, (_irq5 as usize), 0x08, 0x8E);
+    set_gate(38, (_irq6 as usize), 0x08, 0x8E);
+    set_gate(39, (_irq7 as usize), 0x08, 0x8E);
+    set_gate(40, (_irq8 as usize), 0x08, 0x8E);
+    set_gate(41, (_irq9 as usize), 0x08, 0x8E);
+    set_gate(42, (_irq10 as usize), 0x08, 0x8E); 
+    set_gate(43, (_irq11 as usize), 0x08, 0x8E);
+    set_gate(44, (_irq12 as usize), 0x08, 0x8E);
+    set_gate(45, (_irq13 as usize), 0x08, 0x8E);
+    set_gate(46, (_irq14 as usize), 0x08, 0x8E);
+    set_gate(47, (_irq15 as usize), 0x08, 0x8E);
 }
 
 extern "C" {
@@ -148,4 +152,20 @@ extern "C" {
     fn _isr29();
     fn _isr30();
     fn _isr31(); 
+    fn _irq0();
+    fn _irq1();
+    fn _irq2();
+    fn _irq3();
+    fn _irq4();
+    fn _irq5();
+    fn _irq6();
+    fn _irq7();
+    fn _irq8();
+    fn _irq9();
+    fn _irq10();
+    fn _irq11();
+    fn _irq12();
+    fn _irq13();
+    fn _irq14();
+    fn _irq15();
 }

@@ -1,6 +1,8 @@
 [BITS 32]
 global start
 global __morestack
+%include "isr.asm"
+%include "gdt.asm"
 
 start:
     mov esp, _sys_stack
@@ -28,53 +30,20 @@ mboot:
 
 stublet:
     cli
-    jmp k_main
-    lgdt [gdtr]
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov ss, ax
-    jmp 0x08:k_main
-
-k_main:
-    mov [gs:0x30], dword 0
     extern setup
     call setup
+    mov [gs:0x30], dword 0
     sti
     extern main
     call main
     jmp $
     
-gdtr:
-	dw (gdt - gdt_end) + 1
-	dd gdt
-gdt:
-    dq 0
-    ;CS
-    dw 0xffff
-    dw 0x0000
-    db 0x00
-    db 0b10011010
-    db 0x4f
-    db 0x00
-    ;DS
-    dw 0xffff
-    dw 0x0000
-    db 0x00
-    db 0b10010010
-    db 0x4f
-    db 0x00
-gdt_end:
-
 global idt_load
 extern _idtr
 idt_load:
     lidt [_idtr]
     ret
 
-%include "isr.asm"
 
 __morestack:
     jmp $

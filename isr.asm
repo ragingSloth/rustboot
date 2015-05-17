@@ -1,6 +1,7 @@
 %macro ISR_RET 1
     global _isr%1
     _isr%1:
+        cli
         push byte 0
         push byte %1
         jmp isr_stub
@@ -9,6 +10,7 @@
 %macro ISR_NO_RET 1
     global _isr%1
     _isr%1:
+        cli
         push byte %1
         jmp isr_stub
 %endmacro
@@ -48,85 +50,60 @@ ISR_RET 31
 
 extern fault_handler
 isr_stub:
-    pusha
-    push ds
-    push es
-    push fs
-    push gs
+    mov edx, 0x808
+    pushad
 
-    mov ax, 0x10
+    mov ax, ds
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
+
     mov eax, esp
     push eax
     
-    mov eax, fault_handler
-    call eax
+        mov eax, fault_handler
+        call eax 
+
 
     pop eax
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    popa
+    pop eax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    popad
     add esp, 8
+    sti
     iret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;IRQs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;%macro IRQ 1
-;    global _irq%1
-;    _irq%1:
-;        cli
-;        push byte 0
-;        push byte %1
-;        jmp irq_stub
-;%endmacro
-;
-;IRQ 0
-;IRQ 1
-;IRQ 2
-;IRQ 3
-;IRQ 4
-;IRQ 5
-;IRQ 6
-;IRQ 7
-;IRQ 8
-;IRQ 9
-;IRQ 10
-;IRQ 11
-;IRQ 12
-;IRQ 13
-;IRQ 14
-;IRQ 15
-;
-;irq_stub:
-;    pusha
-;    push ds
-;    push es
-;    push fs
-;    push gs
-;    mov ax, 0x10
-;    mov ds, ax
-;    mov es, ax
-;    mov fs, ax
-;    mov gs, ax
-;    mov eax, esp
-;    push eax
-;
-;    mov eax, _irq_handler
-;    call eax
-;
-;    pop eax
-;    pop gs
-;    pop fs
-;    pop es
-;    pop ds
-;    popa
-;    add esp, 8
-;    sti
-;    iret
+%macro IRQ 2
+    global _irq%1
+    _irq%1:
+        cli
+        push byte 0
+        push byte %2
+        jmp isr_stub
+%endmacro
+
+IRQ 0,32
+IRQ 1, 33
+IRQ 2, 34
+IRQ 3, 35
+IRQ 4, 36
+IRQ 5, 37
+IRQ 6, 38
+IRQ 7, 39
+IRQ 8, 40
+IRQ 9, 41
+IRQ 10, 42
+IRQ 11, 43
+IRQ 12, 44
+IRQ 13, 45
+IRQ 14, 46
+IRQ 15, 47

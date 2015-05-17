@@ -8,13 +8,15 @@ pub mod utils;
 pub mod io;
 pub mod idt;
 pub mod isr;
+pub mod gdt;
 
 
 #[no_mangle]
 #[no_stack_check]
 pub extern "C" fn setup() {
+    //gdt::install_gdt();
     idt::install_idt();
-    isr::install_isrs();
+    isr::install_isr();
 }
 
 #[no_mangle]
@@ -27,7 +29,6 @@ pub extern "C" fn main() {
         bg : io::Red as u16,
         fg : io::Black as u16, 
     };
-    x.puts("hello world!\n");
-    x.puts("hello world!\n");
+    x.puts("hello world!");
     loop {}
 }

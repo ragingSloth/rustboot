@@ -29,8 +29,8 @@ extern "C" {
 
 pub fn set_gate(num: usize, base: usize, sel: u16, flags: u8) {
     unsafe {
-        let bas_lo = ((base & 0xFFFF0000) >> 16) as u16;
-        let bas_hi = (base & 0x0000FFFF) as u16;
+        let bas_lo = (base & 0xFFFF) as u16;
+        let bas_hi = ((base & 0xFFFF0000) >> 16) as u16;
         idt.get_unchecked_mut(num).base_lo = bas_lo;
         idt.get_unchecked_mut(num).base_hi = bas_hi;
         idt.get_unchecked_mut(num).sel = sel;
