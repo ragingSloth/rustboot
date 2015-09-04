@@ -9,11 +9,11 @@
 // except according to those terms.
 
 //! Exposes the NonZero lang item which provides optimization hints.
+#![unstable(feature = "nonzero",
+            reason = "needs an RFC to flesh out the design")]
 
 use marker::Sized;
-use ops::Deref;
-#[cfg(not(stage0))]
-use ops::CoerceUnsized;
+use ops::{CoerceUnsized, Deref};
 
 /// Unsafe trait to indicate what types are usable with the NonZero struct
 pub unsafe trait Zeroable {}
@@ -35,7 +35,6 @@ unsafe impl Zeroable for u64 {}
 /// NULL or 0 that might allow certain optimizations.
 #[lang = "non_zero"]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-#[unstable(feature = "core")]
 pub struct NonZero<T: Zeroable>(T);
 
 impl<T: Zeroable> NonZero<T> {
@@ -57,5 +56,4 @@ impl<T: Zeroable> Deref for NonZero<T> {
     }
 }
 
-#[cfg(not(stage0))]
 impl<T: Zeroable+CoerceUnsized<U>, U: Zeroable> CoerceUnsized<NonZero<U>> for NonZero<T> {}

@@ -1,7 +1,6 @@
 #![macro_use]
 use core;
-use core::prelude::{Option, None, Some};
-use core::intrinsics::offset;
+//use core::intrinsics::offset;
 //use core::ptr::PtrExt;
 
 pub fn outb(addr: u8, data: u8) {
@@ -26,12 +25,6 @@ pub fn inb(addr: u8) -> u8 {
     }
     data } 
 
-//////////////////////////////////////////////////////
-//lang_items
-//////////////////////////////////////////////////////
-#[lang = "stack_exhausted"] extern fn stack_exhausted() {}
-#[lang = "eh_personality"] extern fn eh_personality() {}
-#[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {}  }
 
 //extern "rust-intrinsic" {
 //    pub fn transmute<T, U>(x: T) -> U;
@@ -91,7 +84,7 @@ macro_rules! range{
 //////////////////////////////////////////////////////
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8{
+pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8{
     for i in 0..n {
         *dest.offset(i as isize) = *src.offset(i as isize);
     }
@@ -100,8 +93,8 @@ pub unsafe extern fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8{
 
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: usize)  -> *mut u8{
-    let mut incr = match src < dest as *const u8 {
+pub unsafe extern "C" fn memmove(dest: *mut u8, src: *const u8, n: usize)  -> *mut u8{
+    match src < dest as *const u8 {
         true => {
             for i in 0..n {
                 *dest.offset((n - i) as isize) = *src.offset((n - i) as isize);
@@ -113,21 +106,21 @@ pub unsafe extern fn memmove(dest: *mut u8, src: *const u8, n: usize)  -> *mut u
             }
         },
     };
-    return dest;
+    dest
 }
 
 #[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memset( s: *mut u8, c: i32, n: usize) -> *mut u8 {
+pub unsafe extern "C" fn memset( s: *mut u8, c: i32, n: usize) -> *mut u8 {
     for i in 0..n {
         *s.offset(i as isize) = c as u8;
     }
     return s;
 }
 
-#[no_mangle]
 #[no_stack_check]
-pub unsafe extern fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
+#[no_mangle]
+pub unsafe extern "C" fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
     for i in 0..n {
         let a = *s1.offset(i as isize);
         let b = *s2.offset(i as isize);

@@ -10,13 +10,14 @@
 
 /// Entry point of thread panic, for details, see std::macros
 #[macro_export]
+#[allow_internal_unstable]
 macro_rules! panic {
     () => (
         panic!("explicit panic")
     );
     ($msg:expr) => ({
         static _MSG_FILE_LINE: (&'static str, &'static str, u32) = ($msg, file!(), line!());
-        ::core::panicking::panic(&_MSG_FILE_LINE)
+        $crate::panicking::panic(&_MSG_FILE_LINE)
     });
     ($fmt:expr, $($arg:tt)*) => ({
         // The leading _'s are to avoid dead code warnings if this is
@@ -24,7 +25,7 @@ macro_rules! panic {
         // insufficient, since the user may have
         // `#[forbid(dead_code)]` and which cannot be overridden.
         static _FILE_LINE: (&'static str, u32) = (file!(), line!());
-        ::core::panicking::panic_fmt(format_args!($fmt, $($arg)*), &_FILE_LINE)
+        $crate::panicking::panic_fmt(format_args!($fmt, $($arg)*), &_FILE_LINE)
     });
 }
 
@@ -173,12 +174,11 @@ macro_rules! try {
 /// # Examples
 ///
 /// ```
-/// # #![allow(unused_must_use)]
 /// use std::io::Write;
 ///
 /// let mut w = Vec::new();
-/// write!(&mut w, "test");
-/// write!(&mut w, "formatted {}", "arguments");
+/// write!(&mut w, "test").unwrap();
+/// write!(&mut w, "formatted {}", "arguments").unwrap();
 /// ```
 #[macro_export]
 macro_rules! write {

@@ -49,21 +49,27 @@
 // Do not remove on snapshot creation. Needed for bootstrap. (Issue #22364)
 #![cfg_attr(stage0, feature(custom_attribute))]
 #![crate_name = "core"]
-#![unstable(feature = "core")]
+#![unstable(feature = "core",
+            reason = "the libcore library has not yet been scrutinized for \
+                      stabilization in terms of structure and naming")]
 #![staged_api]
 #![crate_type = "rlib"]
 #![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
-       html_favicon_url = "http://www.rust-lang.org/favicon.ico",
+       html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
        html_root_url = "http://doc.rust-lang.org/nightly/",
        html_playground_url = "http://play.rust-lang.org/")]
 #![doc(test(no_crate_inject))]
 
-#![feature(no_std)]
-#![no_std]
+#![cfg_attr(stage0, feature(no_std))]
+#![cfg_attr(stage0, no_std)]
+#![cfg_attr(not(stage0), feature(no_core))]
+#![cfg_attr(not(stage0), no_core)]
 #![allow(raw_pointer_derive)]
 #![deny(missing_docs)]
 
-#![feature(intrinsics, lang_items)]
+#![feature(associated_type_defaults)]
+#![feature(intrinsics)]
+#![feature(lang_items)]
 #![feature(on_unimplemented)]
 #![feature(simd)]
 #![feature(staged_api)]
@@ -74,6 +80,8 @@
 #![feature(concat_idents)]
 #![feature(reflect)]
 #![feature(custom_attribute)]
+#![feature(const_fn)]
+#![feature(allow_internal_unstable)]
 
 #[macro_use]
 mod macros;
@@ -149,28 +157,27 @@ pub mod str;
 pub mod hash;
 pub mod fmt;
 
-#[doc(primitive = "bool")]
-mod bool {
-}
-
 // note: does not need to be public
 mod tuple;
 
+// A curious inner-module that's not exported that contains the bindings of core
+// so that compiler-expanded references to `core::$foo` can be resolved within
+// core itself.
+//
+// Note that no crate-defined macros require this module due to the existence of
+// the `$crate` meta variable, only those expansions defined in the compiler
+// require this. This is because the compiler doesn't currently know that it's
+// compiling the core library when it's compiling this library, so it expands
+// all references to `::core::$foo`
 #[doc(hidden)]
+#[cfg(stage0)]
 mod core {
-    pub use intrinsics;
-    pub use panicking;
-    pub use fmt;
-    pub use clone;
-    pub use cmp;
-    pub use hash;
-    pub use marker;
-    pub use option;
-    pub use iter;
-}
-
-#[doc(hidden)]
-mod std {
-    // range syntax
-    pub use ops;
+    pub use intrinsics;     // derive(PartialOrd)
+    pub use fmt;            // format_args!
+    pub use clone;          // derive(Clone)
+    pub use cmp;            // derive(Ord)
+    pub use hash;           // derive(Hash)
+    pub use marker;         // derive(Copy)
+    pub use option;         // iterator protocol
+    pub use iter;           // iterator protocol
 }

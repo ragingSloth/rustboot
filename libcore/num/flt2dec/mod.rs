@@ -126,8 +126,10 @@ functions.
 // while this is extensively documented, this is in principle private which is
 // only made public for testing. do not expose us.
 #![doc(hidden)]
+#![unstable(feature = "flt2dec",
+            reason = "internal routines only exposed for testing")]
 
-use prelude::*;
+use prelude::v1::*;
 use i16;
 use num::Float;
 use slice::bytes;

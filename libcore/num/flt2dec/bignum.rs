@@ -21,7 +21,8 @@
 
 #![macro_use]
 
-use prelude::*;
+use prelude::v1::*;
+
 use mem;
 use intrinsics;
 
@@ -146,7 +147,7 @@ macro_rules! define_bignum {
 
                 let mut sz = cmp::max(self.size, other.size);
                 let mut carry = false;
-                for (a, b) in self.base[..sz].iter_mut().zip(other.base[..sz].iter()) {
+                for (a, b) in self.base[..sz].iter_mut().zip(&other.base[..sz]) {
                     let (c, v) = (*a).full_add(*b, carry);
                     *a = v;
                     carry = c;
@@ -166,7 +167,7 @@ macro_rules! define_bignum {
 
                 let sz = cmp::max(self.size, other.size);
                 let mut noborrow = true;
-                for (a, b) in self.base[..sz].iter_mut().zip(other.base[..sz].iter()) {
+                for (a, b) in self.base[..sz].iter_mut().zip(&other.base[..sz]) {
                     let (c, v) = (*a).full_add(!*b, noborrow);
                     *a = v;
                     noborrow = c;
@@ -183,7 +184,7 @@ macro_rules! define_bignum {
 
                 let mut sz = self.size;
                 let mut carry = 0;
-                for a in self.base[..sz].iter_mut() {
+                for a in &mut self.base[..sz] {
                     let (c, v) = (*a).full_mul(other, carry);
                     *a = v;
                     carry = c;
@@ -351,7 +352,7 @@ define_bignum!(Big32x36: type=Digit32, n=36);
 // this one is used for testing only.
 #[doc(hidden)]
 pub mod tests {
-    use prelude::*;
+    use prelude::v1::*;
     define_bignum!(Big8x3: type=u8, n=3);
 }
 

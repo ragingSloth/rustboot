@@ -1,5 +1,5 @@
 %macro ISR_RET 1
-    global _isr%1
+    [GLOBAL _isr%1]
     _isr%1:
         cli
         push byte 0
@@ -8,7 +8,7 @@
 %endmacro
 
 %macro ISR_NO_RET 1
-    global _isr%1
+    [GLOBAL _isr%1]
     _isr%1:
         cli
         push byte %1
@@ -50,10 +50,10 @@ ISR_RET 31
 
 extern fault_handler
 isr_stub:
-    mov edx, 0x808
+    ;mov edx, 0x808
     pushad
 
-    mov ax, ds
+    mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax

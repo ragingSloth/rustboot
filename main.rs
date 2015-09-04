@@ -1,14 +1,12 @@
 #![no_std]
-#![feature(asm, lang_items, no_std, core)]
-#[allow(missing_copy_implementations, unused_imports, unstable, improper_ctypes)]
-extern crate core;
+#![feature(asm, lang_items, no_std, core, core_intrinsics, core_slice_ext, core_str_ext)]
+#[allow(missing_copy_implementations, unused_imports, improper_ctypes)]
 
-pub mod std {pub use core::*;}
 pub mod utils;
 pub mod io;
 pub mod idt;
 pub mod isr;
-pub mod gdt;
+//pub mod gdt;
 
 
 #[no_mangle]
@@ -23,12 +21,15 @@ pub extern "C" fn setup() {
 #[no_stack_check]
 pub extern "C" fn main() {
     io::clear_screen(io::Red);
-    let mut x = io::Cell {
-        x : 0,
-        y : 0,
-        bg : io::Red as u16,
-        fg : io::Black as u16, 
-    };
+    let mut x = io::Cell::new();
     x.puts("hello world!");
     loop {}
 }
+
+
+//////////////////////////////////////////////////////
+//lang_items
+//////////////////////////////////////////////////////
+#[lang = "stack_exhausted"] extern fn stack_exhausted() {}
+#[lang = "eh_personality"] extern fn eh_personality() {}
+#[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {}  }

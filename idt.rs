@@ -20,10 +20,10 @@ pub struct IDTR {
 static mut idt: [IDT; 256] = [IDT {base_lo: 0, sel: 0, always0: 0, flags: 0, base_hi: 0}; 256];
 
 #[no_mangle]
-pub static mut _idtr: IDTR = IDTR {limit: 0, base: 0};
+pub static mut idtr: IDTR = IDTR {limit: 0, base: 0};
 
 extern "C" {
-    fn idt_load();
+    fn idt_load(ptr: u32);
 }
 
 
@@ -35,13 +35,14 @@ pub fn set_gate(num: usize, base: usize, sel: u16, flags: u8) {
         idt.get_unchecked_mut(num).base_hi = bas_hi;
         idt.get_unchecked_mut(num).sel = sel;
         idt.get_unchecked_mut(num).flags = flags;
+        idt.get_unchecked_mut(num).always0 = 0u8;
     }
 }
 
 pub fn install_idt() {
     unsafe {
-        _idtr.limit = (size_of::<IDT>() * 256 - 1) as u16;
-        _idtr.base = &idt as *const _ as usize;
-        idt_load()
+        idtr.limit = (size_of::<IDT>() * 256 - 1) as u16;
+        idtr.base = &idt as *const _ as usize;
+        idt_load(&idtr as *const _ as u32)
     }
 }

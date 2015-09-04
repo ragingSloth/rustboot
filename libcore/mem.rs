@@ -29,6 +29,19 @@ pub use intrinsics::transmute;
 /// `mem::drop` function in that it **does not run the destructor**, leaking the
 /// value and any resources that it owns.
 ///
+/// There's only a few reasons to use this function. They mainly come
+/// up in unsafe code or FFI code.
+///
+/// * You have an uninitialized value, perhaps for performance reasons, and
+///   need to prevent the destructor from running on it.
+/// * You have two copies of a value (like when writing something like
+///   [`mem::swap`][swap]), but need the destructor to only run once to
+///   prevent a double `free`.
+/// * Transferring resources across [FFI][ffi] boundries.
+///
+/// [swap]: fn.swap.html
+/// [ffi]: ../../book/ffi.html
+///
 /// # Safety
 ///
 /// This function is not marked as `unsafe` as Rust does not guarantee that the
@@ -54,17 +67,47 @@ pub use intrinsics::transmute;
 ///
 /// # Example
 ///
+/// Leak some heap memory by never deallocating it:
+///
+/// ```rust
+/// use std::mem;
+///
+/// let heap_memory = Box::new(3);
+/// mem::forget(heap_memory);
+/// ```
+///
+/// Leak an I/O object, never closing the file:
+///
 /// ```rust,no_run
 /// use std::mem;
 /// use std::fs::File;
 ///
-/// // Leak some heap memory by never deallocating it
-/// let heap_memory = Box::new(3);
-/// mem::forget(heap_memory);
-///
-/// // Leak an I/O object, never closing the file
 /// let file = File::open("foo.txt").unwrap();
 /// mem::forget(file);
+/// ```
+///
+/// The `mem::swap` function uses `mem::forget` to good effect:
+///
+/// ```rust
+/// use std::mem;
+/// use std::ptr;
+///
+/// fn swap<T>(x: &mut T, y: &mut T) {
+///     unsafe {
+///         // Give ourselves some scratch space to work with
+///         let mut t: T = mem::uninitialized();
+///
+///         // Perform the swap, `&mut` pointers never alias
+///         ptr::copy_nonoverlapping(&*x, &mut t, 1);
+///         ptr::copy_nonoverlapping(&*y, x, 1);
+///         ptr::copy_nonoverlapping(&t, y, 1);
+///
+///         // y and t now point to the same thing, but we need to completely
+///         // forget `t` because we do not want to run the destructor for `T`
+///         // on its value, which is still owned somewhere outside this function.
+///         mem::forget(t);
+///     }
+/// }
 /// ```
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn forget<T>(t: T) {
@@ -95,27 +138,10 @@ pub fn size_of<T>() -> usize {
 ///
 /// assert_eq!(4, mem::size_of_val(&5i32));
 /// ```
-#[cfg(not(stage0))]
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn size_of_val<T: ?Sized>(val: &T) -> usize {
     unsafe { intrinsics::size_of_val(val) }
-}
-
-/// Returns the size of the type that `_val` points to in bytes.
-///
-/// # Examples
-///
-/// ```
-/// use std::mem;
-///
-/// assert_eq!(4, mem::size_of_val(&5i32));
-/// ```
-#[cfg(stage0)]
-#[inline]
-#[stable(feature = "rust1", since = "1.0.0")]
-pub fn size_of_val<T>(_val: &T) -> usize {
-    size_of::<T>()
 }
 
 /// Returns the ABI-required minimum alignment of a type
@@ -131,6 +157,7 @@ pub fn size_of_val<T>(_val: &T) -> usize {
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[deprecated(reason = "use `align_of` instead", since = "1.2.0")]
 pub fn min_align_of<T>() -> usize {
     unsafe { intrinsics::min_align_of::<T>() }
 }
@@ -144,33 +171,16 @@ pub fn min_align_of<T>() -> usize {
 ///
 /// assert_eq!(4, mem::min_align_of_val(&5i32));
 /// ```
-#[cfg(not(stage0))]
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[deprecated(reason = "use `align_of_val` instead", since = "1.2.0")]
 pub fn min_align_of_val<T: ?Sized>(val: &T) -> usize {
     unsafe { intrinsics::min_align_of_val(val) }
 }
 
-/// Returns the ABI-required minimum alignment of the type of the value that `_val` points to
-///
-/// # Examples
-///
-/// ```
-/// use std::mem;
-///
-/// assert_eq!(4, mem::min_align_of_val(&5i32));
-/// ```
-#[cfg(stage0)]
-#[inline]
-#[stable(feature = "rust1", since = "1.0.0")]
-pub fn min_align_of_val<T>(_val: &T) -> usize {
-    min_align_of::<T>()
-}
-
 /// Returns the alignment in memory for a type.
 ///
-/// This function will return the alignment, in bytes, of a type in memory. If the alignment
-/// returned is adhered to, then the type is guaranteed to function properly.
+/// This is the alignment used for struct fields. It may be smaller than the preferred alignment.
 ///
 /// # Examples
 ///
@@ -182,17 +192,10 @@ pub fn min_align_of_val<T>(_val: &T) -> usize {
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn align_of<T>() -> usize {
-    // We use the preferred alignment as the default alignment for a type. This
-    // appears to be what clang migrated towards as well:
-    //
-    // http://lists.cs.uiuc.edu/pipermail/cfe-commits/Week-of-Mon-20110725/044411.html
-    unsafe { intrinsics::pref_align_of::<T>() }
+    unsafe { intrinsics::min_align_of::<T>() }
 }
 
-/// Returns the alignment of the type of the value that `_val` points to.
-///
-/// This is similar to `align_of`, but function will properly handle types such as trait objects
-/// (in the future), returning the alignment for an arbitrary value at runtime.
+/// Returns the ABI-required minimum alignment of the type of the value that `val` points to
 ///
 /// # Examples
 ///
@@ -203,8 +206,8 @@ pub fn align_of<T>() -> usize {
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
-pub fn align_of_val<T>(_val: &T) -> usize {
-    align_of::<T>()
+pub fn align_of_val<T: ?Sized>(val: &T) -> usize {
+    unsafe { intrinsics::min_align_of_val(val) }
 }
 
 /// Creates a value initialized to zero.
@@ -252,20 +255,84 @@ pub unsafe fn dropped<T>() -> T {
     dropped_impl()
 }
 
-/// Creates an uninitialized value.
+/// Bypasses Rust's normal memory-initialization checks by pretending to
+/// produce a value of type T, while doing nothing at all.
 ///
-/// Care must be taken when using this function, if the type `T` has a destructor and the value
-/// falls out of scope (due to unwinding or returning) before being initialized, then the
-/// destructor will run on uninitialized data, likely leading to crashes.
+/// **This is incredibly dangerous, and should not be done lightly. Deeply
+/// consider initializing your memory with a default value instead.**
 ///
-/// This is useful for FFI functions sometimes, but should generally be avoided.
+/// This is useful for FFI functions and initializing arrays sometimes,
+/// but should generally be avoided.
+///
+/// # Undefined Behaviour
+///
+/// It is Undefined Behaviour to read uninitialized memory. Even just an
+/// uninitialized boolean. For instance, if you branch on the value of such
+/// a boolean your program may take one, both, or neither of the branches.
+///
+/// Note that this often also includes *writing* to the uninitialized value.
+/// Rust believes the value is initialized, and will therefore try to Drop
+/// the uninitialized value and its fields if you try to overwrite the memory
+/// in a normal manner. The only way to safely initialize an arbitrary
+/// uninitialized value is with one of the `ptr` functions: `write`, `copy`, or
+/// `copy_nonoverlapping`. This isn't necessary if `T` is a primitive
+/// or otherwise only contains types that don't implement Drop.
+///
+/// If this value *does* need some kind of Drop, it must be initialized before
+/// it goes out of scope (and therefore would be dropped). Note that this
+/// includes a `panic` occurring and unwinding the stack suddenly.
 ///
 /// # Examples
 ///
+/// Here's how to safely initialize an array of `Vec`s.
+///
 /// ```
 /// use std::mem;
+/// use std::ptr;
 ///
-/// let x: i32 = unsafe { mem::uninitialized() };
+/// // Only declare the array. This safely leaves it
+/// // uninitialized in a way that Rust will track for us.
+/// // However we can't initialize it element-by-element
+/// // safely, and we can't use the `[value; 1000]`
+/// // constructor because it only works with `Copy` data.
+/// let mut data: [Vec<u32>; 1000];
+///
+/// unsafe {
+///     // So we need to do this to initialize it.
+///     data = mem::uninitialized();
+///
+///     // DANGER ZONE: if anything panics or otherwise
+///     // incorrectly reads the array here, we will have
+///     // Undefined Behaviour.
+///
+///     // It's ok to mutably iterate the data, since this
+///     // doesn't involve reading it at all.
+///     // (ptr and len are statically known for arrays)
+///     for elem in &mut data[..] {
+///         // *elem = Vec::new() would try to drop the
+///         // uninitialized memory at `elem` -- bad!
+///         //
+///         // Vec::new doesn't allocate or do really
+///         // anything. It's only safe to call here
+///         // because we know it won't panic.
+///         ptr::write(elem, Vec::new());
+///     }
+///
+///     // SAFE ZONE: everything is initialized.
+/// }
+///
+/// println!("{:?}", &data[0]);
+/// ```
+///
+/// This example emphasizes exactly how delicate and dangerous doing this is.
+/// Note that the `vec!` macro *does* let you initialize every element with a
+/// value that is only `Clone`, so the following is semantically equivalent and
+/// vastly less dangerous, as long as you can live with an extra heap
+/// allocation:
+///
+/// ```
+/// let data: Vec<Vec<u32>> = vec![Vec::new(); 1000];
+/// println!("{:?}", &data[0]);
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -301,8 +368,9 @@ pub fn swap<T>(x: &mut T, y: &mut T) {
         ptr::copy_nonoverlapping(&*y, x, 1);
         ptr::copy_nonoverlapping(&t, y, 1);
 
-        // y and t now point to the same thing, but we need to completely forget `t`
-        // because it's no longer relevant.
+        // y and t now point to the same thing, but we need to completely
+        // forget `t` because we do not want to run the destructor for `T`
+        // on its value, which is still owned somewhere outside this function.
         forget(t);
     }
 }
@@ -363,10 +431,47 @@ pub fn replace<T>(dest: &mut T, mut src: T) -> T {
 
 /// Disposes of a value.
 ///
-/// This function can be used to destroy any value by allowing `drop` to take ownership of its
-/// argument.
+/// While this does call the argument's implementation of `Drop`, it will not
+/// release any borrows, as borrows are based on lexical scope.
 ///
 /// # Examples
+///
+/// Basic usage:
+///
+/// ```
+/// let v = vec![1, 2, 3];
+///
+/// drop(v); // explicitly drop the vector
+/// ```
+///
+/// Borrows are based on lexical scope, so this produces an error:
+///
+/// ```ignore
+/// let mut v = vec![1, 2, 3];
+/// let x = &v[0];
+///
+/// drop(x); // explicitly drop the reference, but the borrow still exists
+///
+/// v.push(4); // error: cannot borrow `v` as mutable because it is also
+///            // borrowed as immutable
+/// ```
+///
+/// An inner scope is needed to fix this:
+///
+/// ```
+/// let mut v = vec![1, 2, 3];
+///
+/// {
+///     let x = &v[0];
+///
+///     drop(x); // this is now redundant, as `x` is going out of scope anyway
+/// }
+///
+/// v.push(4); // no problems
+/// ```
+///
+/// Since `RefCell` enforces the borrow rules at runtime, `drop()` can
+/// seemingly release a borrow of one:
 ///
 /// ```
 /// use std::cell::RefCell;
@@ -406,17 +511,22 @@ macro_rules! repeat_u8_as_u64 {
 //
 // And of course, 0x00 brings back the old world of zero'ing on drop.
 #[unstable(feature = "filling_drop")]
+#[allow(missing_docs)]
 pub const POST_DROP_U8: u8 = 0x1d;
 #[unstable(feature = "filling_drop")]
+#[allow(missing_docs)]
 pub const POST_DROP_U32: u32 = repeat_u8_as_u32!(POST_DROP_U8);
 #[unstable(feature = "filling_drop")]
+#[allow(missing_docs)]
 pub const POST_DROP_U64: u64 = repeat_u8_as_u64!(POST_DROP_U8);
 
 #[cfg(target_pointer_width = "32")]
 #[unstable(feature = "filling_drop")]
+#[allow(missing_docs)]
 pub const POST_DROP_USIZE: usize = POST_DROP_U32 as usize;
 #[cfg(target_pointer_width = "64")]
 #[unstable(feature = "filling_drop")]
+#[allow(missing_docs)]
 pub const POST_DROP_USIZE: usize = POST_DROP_U64 as usize;
 
 /// Interprets `src` as `&U`, and then reads `src` without moving the contained
@@ -451,9 +561,13 @@ pub unsafe fn transmute_copy<T, U>(src: &T) -> U {
 
 /// Transforms lifetime of the second pointer to match the first.
 #[inline]
-#[unstable(feature = "core",
+#[unstable(feature = "copy_lifetime",
            reason = "this function may be removed in the future due to its \
                      questionable utility")]
+#[deprecated(since = "1.2.0",
+             reason = "unclear that this function buys more safety and \
+                       lifetimes are generally not handled as such in unsafe \
+                       code today")]
 pub unsafe fn copy_lifetime<'a, S: ?Sized, T: ?Sized + 'a>(_ptr: &'a S,
                                                         ptr: &T) -> &'a T {
     transmute(ptr)
@@ -461,9 +575,13 @@ pub unsafe fn copy_lifetime<'a, S: ?Sized, T: ?Sized + 'a>(_ptr: &'a S,
 
 /// Transforms lifetime of the second mutable pointer to match the first.
 #[inline]
-#[unstable(feature = "core",
+#[unstable(feature = "copy_lifetime",
            reason = "this function may be removed in the future due to its \
                      questionable utility")]
+#[deprecated(since = "1.2.0",
+             reason = "unclear that this function buys more safety and \
+                       lifetimes are generally not handled as such in unsafe \
+                       code today")]
 pub unsafe fn copy_mut_lifetime<'a, S: ?Sized, T: ?Sized + 'a>(_ptr: &'a S,
                                                                ptr: &mut T)
                                                               -> &'a mut T

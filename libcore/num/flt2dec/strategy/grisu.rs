@@ -16,7 +16,8 @@ Rust adaptation of Grisu3 algorithm described in [1]. It uses about
     accurately with integers. SIGPLAN Not. 45, 6 (June 2010), 233-243.
 */
 
-use prelude::*;
+use prelude::v1::*;
+
 use num::Float;
 
 use num::flt2dec::{Decoded, MAX_SIG_DIGITS, round_up};
@@ -87,7 +88,7 @@ for i in xrange(-308, 333, 8):
     f = ((f << 64 >> (l-1)) + 1) >> 1; e += l - 64
     print '    (%#018x, %5d, %4d),' % (f, e, i)
 */
-// FIXME(#22540) const ref to static array seems to ICE
+
 #[doc(hidden)]
 pub static CACHED_POW10: [(u64, i16, i16); 81] = [ // (f, e, k)
     (0xe61acf033d1a45df, -1087, -308),
@@ -746,4 +747,3 @@ pub fn format_exact(d: &Decoded, buf: &mut [u8], limit: i16) -> (/*#digits*/ usi
         None => fallback(d, buf, limit),
     }
 }
-

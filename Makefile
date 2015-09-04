@@ -3,7 +3,8 @@ LD=ld
 RUSTC=rustc
 NASM=nasm
 QEMU=qemu-system-i386
-RUSTCFLAGS= -L . -O --target i686-unknown-linux-gnu --crate-type lib -C relocation-model=static -Z no-landing-pads
+RUSTCFLAGS= -L . -O -g --target i686-unknown-linux-gnu --crate-type lib -C relocation-model=static -Z no-landing-pads
+#RUSTCFLAGS= -L . -O --target i686-unknown-linux-gnu --crate-type lib  -Z no-landing-pads
 
 .SUFFIXES: .o .rs .asm
 .PHONY: clean run reset bin
@@ -11,7 +12,7 @@ RUSTCFLAGS= -L . -O --target i686-unknown-linux-gnu --crate-type lib -C relocati
 all: kernel.bin
 
 .asm.o:
-	$(NASM) -f aout -o $@ $<
+	$(NASM) -f elf32 -o $@ $<
 
 libcore.rlib: 
 	$(RUSTC) $(RUSTCFLAGS) libcore/lib.rs
@@ -19,8 +20,8 @@ libcore.rlib:
 main.o: main.rs libcore.rlib
 	$(RUSTC) $(RUSTCFLAGS) -o $@ --emit obj $<
 
-kernel.bin: start.o main.o 
-	$(LD) -melf_i386 -Tlink.ld -o $@ $^
+kernel.bin: start.o main.o libcore.rlib
+	$(LD) -melf_i386 -Tlink.ld -o $@ $^ 
 
 
 clean:

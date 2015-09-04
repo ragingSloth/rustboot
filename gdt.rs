@@ -1,8 +1,9 @@
 use core::slice::SliceExt;
 use core::intrinsics::size_of;
+use core::marker::Copy;
+use core::clone::Clone;
 
-#[derive(Clone, Copy)]
-#[repr(C, packed)]
+#[repr(packed)]
 struct GDT {
     limit: u16,
     base_lo: u16,
@@ -11,14 +12,16 @@ struct GDT {
     granularity: u8,
     base_hi: u8
 }
+impl Copy for GDT {}
+impl Clone for GDT {fn clone(&self) -> Self {*self}}
 
-#[repr(C, packed)]
+#[repr(packed)]
 struct GDTR {
     limit: u16,
     base: usize
 }
 
-static mut gdt: [GDT; 3] = [GDT {limit: 0, base_lo: 0, base_mid: 0, access: 0, granularity: 0, base_hi:0}; 3];
+static mut gdt: [GDT; 5] = [GDT {limit: 0, base_lo: 0, base_mid: 0, access: 0, granularity: 0, base_hi:0}; 5];
 static mut gdtr: GDTR = GDTR {limit: 0, base: 0};
 
 pub fn install_gdt() {
@@ -28,20 +31,28 @@ pub fn install_gdt() {
         set_gate(0, 0, 0, 0, 0);
         set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);
         set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
-        //set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);
-        //set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);
+        set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);
+        set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);
         gdt_flush(&gdtr as *const _ as u32);
     }
 }
 
 unsafe fn set_gate(num: usize, base: usize, limit: usize, access: u8, granularity: u8) {
-        gdt.get_unchecked_mut(num).base_lo = (base & 0xFFFF) as u16;
-        gdt.get_unchecked_mut(num).base_mid = ((base >> 16) & 0xFF) as u8;
-        gdt.get_unchecked_mut(num).base_hi = ((base >> 24) & 0xFF) as u8;
-        gdt.get_unchecked_mut(num).limit = (limit & 0xFFFF) as u16;
-        gdt.get_unchecked_mut(num).granularity = ((limit >> 16) & 0x0F) as u8;
-        gdt.get_unchecked_mut(num).granularity |= granularity & 0xF0;
-        gdt.get_unchecked_mut(num).access = access;
+        //gdt.get_unchecked_mut(num).base_lo = (base & 0xFFFF) as u16;
+        //gdt.get_unchecked_mut(num).base_mid = ((base >> 16) & 0xFF) as u8;
+        //gdt.get_unchecked_mut(num).base_hi = ((base >> 24) & 0xFF) as u8;
+        //gdt.get_unchecked_mut(num).limit = (limit & 0xFFFF) as u16;
+        //gdt.get_unchecked_mut(num).granularity = ((limit >> 16) & 0x0F) as u8;
+        //gdt.get_unchecked_mut(num).granularity |= granularity & 0xF0;
+        //gdt.get_unchecked_mut(num).access = access;
+        
+        gdt[num].base_lo = (base & 0xFFFF) as u16;
+        gdt[num].base_mid = ((base >> 16) & 0xFF) as u8;
+        gdt[num].base_hi = ((base >> 24) & 0xFF) as u8;
+        gdt[num].limit = (limit & 0xFFFF) as u16;
+        gdt[num].granularity = ((limit >> 16) & 0x0F) as u8;
+        gdt[num].granularity |= granularity & 0xF0;
+        gdt[num].access = access;
 }
 
 extern {fn gdt_flush(p: u32);}

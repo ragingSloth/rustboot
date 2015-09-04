@@ -54,8 +54,7 @@ pub trait Sized {
 }
 
 /// Types that can be "unsized" to a dynamically sized type.
-#[unstable(feature = "core")]
-#[cfg(not(stage0))]
+#[unstable(feature = "unsize")]
 #[lang="unsize"]
 pub trait Unsize<T> {
     // Empty.
@@ -120,11 +119,10 @@ pub trait Unsize<T> {
 /// ```
 ///
 /// The `PointList` `struct` cannot implement `Copy`, because `Vec<T>` is not `Copy`. If we
-/// attempt to derive a `Copy` implementation, we'll get an error.
+/// attempt to derive a `Copy` implementation, we'll get an error:
 ///
 /// ```text
-/// error: the trait `Copy` may not be implemented for this type; field `points` does not implement
-/// `Copy`
+/// the trait `Copy` may not be implemented for this type; field `points` does not implement `Copy`
 /// ```
 ///
 /// ## How can I implement `Copy`?
@@ -207,7 +205,7 @@ pub trait Copy : Clone {
 /// Any types with interior mutability must also use the `std::cell::UnsafeCell`
 /// wrapper around the value(s) which can be mutated when behind a `&`
 /// reference; not doing this is undefined behaviour (for example,
-/// `transmute`-ing from `&T` to `&mut T` is illegal).
+/// `transmute`-ing from `&T` to `&mut T` is invalid).
 #[stable(feature = "rust1", since = "1.0.0")]
 #[lang = "sync"]
 #[rustc_on_unimplemented = "`{Self}` cannot be shared between threads safely"]
@@ -225,7 +223,10 @@ impl<T> !Sync for *mut T { }
 /// ensure that they are never copied, even if they lack a destructor.
 #[unstable(feature = "core",
            reason = "likely to change with new variance strategy")]
+#[deprecated(since = "1.2.0",
+             reason = "structs are by default not copyable")]
 #[lang = "no_copy_bound"]
+#[allow(deprecated)]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoCopy;
 
@@ -272,7 +273,11 @@ macro_rules! impls{
 /// even though it does not. This allows you to inform the compiler about certain safety properties
 /// of your code.
 ///
-/// Though they both have scary names, `PhantomData<T>` and "phantom types" are unrelated. 👻👻👻
+/// # A ghastly note 👻👻👻
+///
+/// Though they both have scary names, `PhantomData<T>` and 'phantom types' are related, but not
+/// identical. Phantom types are a more general concept that don't require `PhantomData<T>` to
+/// implement, but `PhantomData<T>` is the most common way to implement them in a correct manner.
 ///
 /// # Examples
 ///
@@ -359,7 +364,7 @@ macro_rules! impls{
 /// struct is dropped, it may in turn drop one or more instances of
 /// the type `T`, though that may not be apparent from the other
 /// structure of the type itself. This is commonly necessary if the
-/// structure is using an unsafe pointer like `*mut T` whose referent
+/// structure is using a raw pointer like `*mut T` whose referent
 /// may be dropped when the type is dropped, as a `*mut T` is
 /// otherwise not treated as owned.
 ///
@@ -387,7 +392,7 @@ mod impls {
 /// that function. Here is an example:
 ///
 /// ```
-/// #![feature(core)]
+/// #![feature(reflect_marker)]
 /// use std::marker::Reflect;
 /// use std::any::Any;
 /// fn foo<T:Reflect+'static>(x: &T) {
@@ -412,7 +417,8 @@ mod impls {
 ///
 /// [1]: http://en.wikipedia.org/wiki/Parametricity
 #[rustc_reflect_like]
-#[unstable(feature = "core", reason = "requires RFC and more experience")]
+#[unstable(feature = "reflect_marker",
+           reason = "requires RFC and more experience")]
 #[allow(deprecated)]
 #[rustc_on_unimplemented = "`{Self}` does not implement `Any`; \
                             ensure all type parameters are bounded by `Any`"]

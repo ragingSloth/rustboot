@@ -1,7 +1,7 @@
 pub use self::Colors::*;
 
 use utils::IntRange;
-use core::prelude::{SliceExt, StrExt};
+//use core::prelude::{SliceExt, StrExt};
 
 #[repr(u16)]
 pub enum Colors {
@@ -31,6 +31,14 @@ pub struct Cell {
 }
 
 impl Cell {
+    pub fn new() -> Self {
+    Cell {
+            x : 0,
+            y : 0,
+            bg : Red as u16,
+            fg : Black as u16, 
+        }
+    }
     pub fn incr(&mut self) {
         if self.x == 80 {
             self.new_line();
