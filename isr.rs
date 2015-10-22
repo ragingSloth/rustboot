@@ -1,10 +1,11 @@
 use io;
 use idt::set_gate;
 use core::slice::SliceExt;
+use utils::outb;
 
 //courtesy of mvdnes element76
 #[derive(Clone, Copy)]
-#[repr(C)]
+#[repr(C, packed)]
 pub struct Regs {
         _ds: u32, _edi: u32, _esi: u32, _ebp: u32, _esp: u32, _ebx: u32, _edx: u32, _ecx: u32, _eax: u32,
         int_no : u32,
@@ -20,6 +21,8 @@ static messages: [&'static str; 32] = [
     "Breakpoint ",
     "Into Detected Overflow",
     "Out of Bounds",
+    "Invalid opcode",
+    "Coprocessor Not Available",
     "Double Fault",
     "Coprocessor Segment Overrun",
     "Bad TSS",
@@ -30,10 +33,8 @@ static messages: [&'static str; 32] = [
     "Unknown Interrupt",
     "Coprocessor Fault",
     "Alignment Check",
-    "achine Check",
+    "Machine Check",
     "Reserved", 
-    "Reserved",
-    "Reserved",
     "Reserved",
     "Reserved",
     "Reserved",
@@ -59,12 +60,23 @@ pub unsafe extern "C" fn fault_handler(r: Regs) {
             bg : io::Green as u16,
             fg : io::Black as u16, 
         };
-        if r._edx == 0x808 {
-            x.puts("well, could be worse\n")
-        }
+//        if r._edx == 0x808 {
+//            x.puts("well, could be worse\n")
+//        }
         x.puts(messages.get_unchecked(r.int_no as usize));
         x.puts(" Exception. System Halted!");
         loop {}
+    }
+    else if r.int_no < 48 {
+        match r.int_no {
+            x if x < 40 => {
+                ()
+            },
+          _ => {
+              outb(0xA0, 0x20);
+          },
+        }
+        outb(0x20, 0x20);
     }
 }
 

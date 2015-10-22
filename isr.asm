@@ -60,6 +60,7 @@ isr_stub:
     mov gs, ax
 
     mov eax, esp
+    ;could probably make this push into ds and switch the reg implementation to u16
     push eax
     
         mov eax, fault_handler
@@ -107,3 +108,4 @@ IRQ 12, 44
 IRQ 13, 45
 IRQ 14, 46
 IRQ 15, 47
+

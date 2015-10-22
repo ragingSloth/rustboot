@@ -6,6 +6,7 @@ pub mod utils;
 pub mod io;
 pub mod idt;
 pub mod isr;
+pub mod timer;
 //pub mod gdt;
 
 
@@ -13,6 +14,10 @@ pub mod isr;
 #[no_stack_check]
 pub extern "C" fn setup() {
     //gdt::install_gdt();
+    unsafe {
+        idt::irq_handlers[0] = timer::timer_handler;
+    }
+    idt::remap_irq();
     idt::install_idt();
     isr::install_isr();
 }

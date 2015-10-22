@@ -1,5 +1,7 @@
 use core::intrinsics::size_of;
 use core::slice::SliceExt;
+use utils::outb;
+use isr::Regs;
 
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
@@ -18,6 +20,11 @@ pub struct IDTR {
 }
 
 static mut idt: [IDT; 256] = [IDT {base_lo: 0, sel: 0, always0: 0, flags: 0, base_hi: 0}; 256];
+
+fn dummy(reg: Regs) {
+    ()
+}
+pub static mut irq_handlers: [fn(Regs); 16] = [dummy; 16];
 
 #[no_mangle]
 pub static mut idtr: IDTR = IDTR {limit: 0, base: 0};
@@ -46,3 +53,17 @@ pub fn install_idt() {
         idt_load(&idtr as *const _ as u32)
     }
 }
+
+pub fn remap_irq() {
+    outb(0x20, 0x11);
+    outb(0xA0, 0x11);
+    outb(0x21, 0x20);
+    outb(0xA1, 0x28);
+    outb(0x21, 0x04);
+    outb(0xA1, 0x02);
+    outb(0x21, 0x01);
+    outb(0xA1, 0x01);
+    outb(0x21, 0x00);
+    outb(0xA1, 0x00);
+}
+
